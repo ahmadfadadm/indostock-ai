@@ -324,7 +324,7 @@ const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
   setTypedText("");
 
   try {
-    const res = await fetch("http://localhost:3001/api/gemini", {
+    const res = await fetch("/api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

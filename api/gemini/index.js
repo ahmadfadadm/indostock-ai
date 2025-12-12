@@ -33,7 +33,13 @@ Give:
     }
   );
 
+  // 🔍 LOG STATUS HTTP DARI GEMINI
+  console.log("Gemini HTTP status:", response.status);
+
   const data = await response.json();
+
+  // 🔍 LOG RESPONSE GEMINI LENGKAP
+  console.log("Gemini raw response:", JSON.stringify(data, null, 2));
 
   res.status(200).json({
     summary: data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No response",
