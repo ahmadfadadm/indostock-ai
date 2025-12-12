@@ -11,6 +11,7 @@ import {
   Sparkles, Bot, BrainCircuit
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { getGeminiInsight } from './gemini'; // IMPORT BARU
 
 // --- STRICT SPACING SYSTEM (PIXEL PERFECT) ---
 const LAYOUT_PX = "px-6 lg:px-8"; 
@@ -20,7 +21,6 @@ const CARD_PADDING = "p-6";
 // --- STYLE UPDATES ---
 const COMMON_CARD_STYLE = `bg-[#111827]/60 backdrop-blur-2xl border border-white/5 rounded-3xl ${CARD_PADDING} shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 transition-all duration-300 group relative overflow-hidden`;
 
-// Tinggi disamakan jadi 400px agar sejajar
 const UNIFIED_CARD_HEIGHT = "h-[400px]"; 
 
 const COMPANY_META = {
@@ -303,7 +303,7 @@ const App = () => {
     
     let i = 0;
     setTypedText(""); 
-    const speed = 30; // Kecepatan ketik
+    const speed = 20; // Dipercepat sedikit agar lebih responsif
     
     const intervalId = setInterval(() => {
       setTypedText((prev) => {
@@ -319,42 +319,32 @@ const App = () => {
     return () => clearInterval(intervalId);
   }, [aiAnalysis.text]);
 
-const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
-  setIsAiLoading(true);
-  setTypedText("");
+  // --- UPDATE LOGIC AI PAKE FILE LOKAL src/gemini.js ---
+  const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
+    setIsAiLoading(true);
+    setTypedText("");
 
-  try {
-    const res = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        stock: stockCode,
-        price,
-        change,
-      }),
-    });
+    try {
+        // Panggil fungsi langsung, bukan fetch ke /api
+        const data = await getGeminiInsight(stockCode, price, change);
 
-    if (!res.ok) throw new Error("AI request failed");
+        setAiAnalysis({
+            text: data.summary,
+            upside: data.upside,
+            sentiment: data.sentiment,
+        });
 
-    const data = await res.json();
-
-    setAiAnalysis({
-      text: data.summary,
-      upside: data.upside,
-      sentiment: data.sentiment,
-    });
-
-  } catch (error) {
-    console.error("AI Error:", error);
-    setAiAnalysis({
-      text: `Mode offline: AI tidak dapat diakses saat ini.`,
-      upside: "N/A",
-      sentiment: "Neutral",
-    });
-  } finally {
-    setIsAiLoading(false);
-  }
-}, []);
+    } catch (error) {
+        console.error("AI Error:", error);
+        setAiAnalysis({
+            text: `Mode offline: AI tidak dapat diakses saat ini.`,
+            upside: "N/A",
+            sentiment: "Neutral",
+        });
+    } finally {
+        setIsAiLoading(false);
+    }
+  }, []);
 
   const customTicks = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
@@ -698,6 +688,17 @@ const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
                                                             </>
                                                         )}
                                                     </p>
+                                                    {/* Tambahan Info Upside dari AI */}
+                                                    {!isAiLoading && aiAnalysis.upside !== 'N/A' && (
+                                                        <div className="mt-3 flex gap-2">
+                                                            <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-1 rounded border border-indigo-500/20">
+                                                                Upside: {aiAnalysis.upside}
+                                                            </span>
+                                                            <span className={`text-[10px] px-2 py-1 rounded border ${aiAnalysis.sentiment.toLowerCase() === 'positive' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
+                                                                {aiAnalysis.sentiment}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -761,7 +762,7 @@ const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
                                     return (
                                     <div key={stock.code} className={`flex justify-between items-center p-3.5 rounded-xl transition-all cursor-pointer border border-transparent ${stock.code === selectedStock.code ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10' : 'hover:bg-white/5 hover:border-white/5'}`} onClick={() => handleSelectStock(stock)}>
                                         <div className="flex items-center gap-3"><div className={`w-10 h-10 flex items-center justify-center shrink-0 ${isGainer ? 'shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)] rounded-full ring-1 ring-emerald-500/20' : 'shadow-[0_0_15px_-3px_rgba(244,63,94,0.3)] rounded-full ring-1 ring-rose-500/20'}`}><StockLogo code={stock.code} className="w-full h-full" /></div><div><p className="font-black text-sm text-white tracking-wide">{stock.code.replace('.JK', '')}</p><p className="text-[10px] sm:text-xs text-slate-400 font-mono">Rp {stock.price ? stock.price.toLocaleString() : '-'}</p></div></div>
-                                        <div className={`text-sm font-bold flex items-center ${isGainer ? 'text-emerald-400' : 'text-rose-400'}`}>{stock.change > 0 ? '+' : ''}{stock.change ? stock.change.toFixed(2) : '0.00'}%{isGainer ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} className="mr-0.5" />}</div>
+                                            <div className={`text-sm font-bold flex items-center ${isGainer ? 'text-emerald-400' : 'text-rose-400'}`}>{stock.change > 0 ? '+' : ''}{stock.change ? stock.change.toFixed(2) : '0.00'}%{isGainer ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} className="mr-0.5" />}</div>
                                     </div>
                                     );
                                 })}
