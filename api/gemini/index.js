@@ -23,7 +23,7 @@ Give:
 `;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -33,16 +33,23 @@ Give:
     }
   );
 
-  // 🔍 LOG STATUS HTTP DARI GEMINI
-  console.log("Gemini HTTP status:", response.status);
-
   const data = await response.json();
 
-  // 🔍 LOG RESPONSE GEMINI LENGKAP
-  console.log("Gemini raw response:", JSON.stringify(data, null, 2));
+  // 🚨 Guard error Gemini
+  if (!response.ok) {
+    console.error("Gemini API error:", data);
+    return res.status(500).json({ error: "Gemini API failed" });
+  }
+
+  // ✅ PARSING YANG BENAR (INI KUNCINYA)
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      ?.map(p => p.text)
+      .join("\n")
+      .trim() || "No response from Gemini";
 
   res.status(200).json({
-    summary: data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No response",
+    summary: text,
     sentiment: "Neutral",
     upside: "N/A",
   });
