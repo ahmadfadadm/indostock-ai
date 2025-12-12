@@ -1,3 +1,5 @@
+// src/gemini.js
+
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 export const getGeminiInsight = async (stockCode, price, change) => {
@@ -10,7 +12,10 @@ export const getGeminiInsight = async (stockCode, price, change) => {
     };
   }
 
-  // Prompt yang dioptimalkan agar Gemini membalas dengan JSON murni
+  // Gunakan model 'gemini-1.5-flash-latest' atau 'gemini-pro' (lebih stabil)
+  // Jika 404 terus, ganti MODEL_NAME jadi 'gemini-pro'
+  const MODEL_NAME = "gemini-1.5-flash-latest"; 
+  
   const prompt = `
     Analyze this Indonesian stock data strictly.
     Code: ${stockCode}
@@ -28,7 +33,7 @@ export const getGeminiInsight = async (stockCode, price, change) => {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -41,37 +46,16 @@ export const getGeminiInsight = async (stockCode, price, change) => {
     );
 
     if (!response.ok) {
+      // Jika error 404, berarti model salah nama. Coba fallback ke gemini-pro
+      if (response.status === 404) {
+         console.warn("Model 1.5 Flash not found (404), trying gemini-pro...");
+         return getGeminiFallback(stockCode, price, change, prompt);
+      }
       throw new Error(`Gemini API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // Validasi respons dari Gemini
-    if (!data.candidates || data.candidates.length === 0) {
-      return { summary: "Tidak ada data dari AI.", sentiment: "Neutral", upside: "N/A" };
-    }
-
-    const rawText = data.candidates[0].content.parts[0].text;
-    
-    // Bersihkan format Markdown jika Gemini mengirim ```json ... ```
-    const cleanJson = rawText.replace(/```json|```/g, '').trim();
-
-    try {
-      const parsedData = JSON.parse(cleanJson);
-      return {
-        summary: parsedData.summary || "Analisis selesai.",
-        sentiment: parsedData.sentiment || "Neutral",
-        upside: parsedData.upside || "N/A"
-      };
-    } catch (parseError) {
-      // Fallback jika Gemini gagal mengirim JSON valid
-      console.warn("Gemini did not return valid JSON, using raw text fallback.");
-      return {
-        summary: cleanJson.substring(0, 150) + "...", // Ambil teks mentah
-        sentiment: change >= 0 ? "Positive" : "Negative",
-        upside: "N/A"
-      };
-    }
+    return parseGeminiResponse(data, change);
 
   } catch (error) {
     console.error("Gemini Fetch Error:", error);
@@ -82,3 +66,47 @@ export const getGeminiInsight = async (stockCode, price, change) => {
     };
   }
 };
+
+// Fungsi Cadangan jika Model Utama Gagal
+const getGeminiFallback = async (stockCode, price, change, prompt) => {
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            }
+        );
+        if (!response.ok) throw new Error(`Fallback Error: ${response.status}`);
+        const data = await response.json();
+        return parseGeminiResponse(data, change);
+    } catch (err) {
+        return { summary: "AI Error (Fallback failed)", sentiment: "Neutral", upside: "N/A" };
+    }
+}
+
+// Helper untuk parsing data
+const parseGeminiResponse = (data, change) => {
+    if (!data.candidates || data.candidates.length === 0) {
+      return { summary: "Tidak ada data dari AI.", sentiment: "Neutral", upside: "N/A" };
+    }
+
+    const rawText = data.candidates[0].content.parts[0].text;
+    const cleanJson = rawText.replace(/```json|```/g, '').trim();
+
+    try {
+      const parsedData = JSON.parse(cleanJson);
+      return {
+        summary: parsedData.summary || "Analisis selesai.",
+        sentiment: parsedData.sentiment || "Neutral",
+        upside: parsedData.upside || "N/A"
+      };
+    } catch (parseError) {
+      return {
+        summary: cleanJson.substring(0, 150) + "...",
+        sentiment: change >= 0 ? "Positive" : "Negative",
+        upside: "N/A"
+      };
+    }
+}
