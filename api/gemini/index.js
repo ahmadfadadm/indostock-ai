@@ -12,6 +12,7 @@ export default async function handler(req, res) {
 
   const prompt = `
 Analyze Indonesian stock:
+
 Code: ${stock}
 Price: ${price}
 Change: ${change}%
@@ -23,30 +24,38 @@ Give:
 `;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ]
       }),
     }
   );
 
   const data = await response.json();
 
-  // 🚨 Guard error Gemini
-  if (!response.ok) {
-    console.error("Gemini API error:", data);
-    return res.status(500).json({ error: "Gemini API failed" });
+  console.log("Gemini status:", response.status);
+  console.log("Gemini response:", JSON.stringify(data, null, 2));
+
+  if (!data?.candidates?.length) {
+    return res.status(500).json({
+      summary: "AI service unavailable",
+      sentiment: "Neutral",
+      upside: "N/A",
+    });
   }
 
-  // ✅ PARSING YANG BENAR (INI KUNCINYA)
-  const text =
-    data?.candidates?.[0]?.content?.parts
-      ?.map(p => p.text)
-      .join("\n")
-      .trim() || "No response from Gemini";
+  const text = data.candidates[0].content.parts
+    .map(p => p.text)
+    .join("\n")
+    .trim();
 
   res.status(200).json({
     summary: text,
