@@ -12,9 +12,9 @@ export const getGeminiInsight = async (stockCode, price, change) => {
     };
   }
 
-  // Gunakan model 'gemini-1.5-flash-latest' atau 'gemini-pro' (lebih stabil)
-  // Jika 404 terus, ganti MODEL_NAME jadi 'gemini-pro'
-  const MODEL_NAME = "gemini-1.5-flash-latest"; 
+  // --- PERBAIKAN DI SINI: Ganti nama model ke yang paling standar ---
+  // Hapus '-latest' karena sering menyebabkan 404 di v1beta
+  const MODEL_NAME = "gemini-1.5-flash"; 
   
   const prompt = `
     Analyze this Indonesian stock data strictly.
@@ -46,12 +46,9 @@ export const getGeminiInsight = async (stockCode, price, change) => {
     );
 
     if (!response.ok) {
-      // Jika error 404, berarti model salah nama. Coba fallback ke gemini-pro
-      if (response.status === 404) {
-         console.warn("Model 1.5 Flash not found (404), trying gemini-pro...");
-         return getGeminiFallback(stockCode, price, change, prompt);
-      }
-      throw new Error(`Gemini API Error: ${response.status}`);
+      console.warn(`Model ${MODEL_NAME} failed (${response.status}). Trying fallback...`);
+      // Fallback ke model gemini-1.5-pro (biasanya lebih stabil jika flash error)
+      return getGeminiFallback(stockCode, price, change, prompt);
     }
 
     const data = await response.json();
@@ -67,11 +64,11 @@ export const getGeminiInsight = async (stockCode, price, change) => {
   }
 };
 
-// Fungsi Cadangan jika Model Utama Gagal
+// Fungsi Cadangan: Menggunakan 'gemini-1.5-pro' (bukan gemini-pro biasa)
 const getGeminiFallback = async (stockCode, price, change, prompt) => {
     try {
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -82,11 +79,12 @@ const getGeminiFallback = async (stockCode, price, change, prompt) => {
         const data = await response.json();
         return parseGeminiResponse(data, change);
     } catch (err) {
-        return { summary: "AI Error (Fallback failed)", sentiment: "Neutral", upside: "N/A" };
+        console.error("Fallback failed:", err);
+        return { summary: "AI sedang sibuk. Coba refresh sebentar lagi.", sentiment: "Neutral", upside: "N/A" };
     }
 }
 
-// Helper untuk parsing data
+// Helper parsing data (Sama seperti sebelumnya)
 const parseGeminiResponse = (data, change) => {
     if (!data.candidates || data.candidates.length === 0) {
       return { summary: "Tidak ada data dari AI.", sentiment: "Neutral", upside: "N/A" };
