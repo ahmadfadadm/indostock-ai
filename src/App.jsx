@@ -198,7 +198,15 @@ const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
   if (!stockList || stockList.length === 0) return <div className="p-4 text-slate-500 text-sm animate-pulse">Waiting for market data...</div>;
 
   return (
-    <div className="-mx-6 lg:-mx-8">
+    <div className="-mx-6 lg:-mx-8 relative">
+        {/* Update:
+            1. Kept 'top-0 bottom-0' to ensure vertical containment within the slider area.
+            2. Increased z-index to 'z-30'. This is crucial to make sure the shadow overlay sits ON TOP of the selected card's glow effect (which is z-10).
+            3. Made the gradient more opaque in the middle ('via-[#020617]/70' instead of '/50'). This helps to effectively cover or "dim" the glow of the card underneath.
+            4. Slightly increased the width to 'w-28 sm:w-56' to allow for a longer, softer fade-out, eliminating any hard "crop" lines.
+        */}
+        <div className="absolute top-0 bottom-0 right-0 w-28 sm:w-56 bg-gradient-to-l from-[#020617] via-[#020617]/70 to-transparent z-30 pointer-events-none" />
+
         <div className="relative w-full overflow-x-auto whitespace-nowrap hide-scrollbar px-6 lg:px-8 py-10 -my-10">
             <div className={`flex ${LAYOUT_GAP}`}> 
             {stockList.map((stock) => {
@@ -210,10 +218,10 @@ const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
                     key={stock.code}
                     onClick={() => onSelectStock(stock)}
                     className={`
-                        relative flex flex-col items-start justify-center p-6 rounded-3xl min-w-60 h-40
+                        relative flex flex-col items-start justify-center p-5 rounded-3xl min-w-60 h-40
                         transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] text-left group focus:outline-none border
                         ${isSelected 
-                        ? 'bg-linear-to-br from-indigo-600 to-violet-700 shadow-[0_15px_40px_-10px_rgba(99,102,241,0.6)] border-transparent ring-2 ring-white scale-[1.05] z-10' 
+                        ? 'bg-linear-to-br from-indigo-600 to-violet-700 shadow-[0_15px_40px_-10px_rgba(99,102,241,0.6)] border-transparent ring-1 ring-white scale-[1.05] z-10' 
                         : 'bg-[#111827]/60 backdrop-blur-2xl border-white/5 ring-0 ring-transparent shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 hover:bg-[#1f2937]'}
                     `}
                 >
@@ -221,7 +229,7 @@ const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
                         <div className="flex justify-between items-start w-full mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 shrink-0"><StockLogo code={stock.code} className="w-full h-full" /></div>
-                                <span className={`text-xl font-black tracking-wide ${isSelected ? 'text-white' : 'text-slate-200'}`}>{stock.code.replace('.JK','')}</span>
+                                <span className={`text-xl font-extrabold tracking-wide ${isSelected ? 'text-white' : 'text-slate-200'}`}>{stock.code.replace('.JK','')}</span>
                             </div>
                             {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_15px_white] animate-pulse"></div>}
                         </div>
@@ -853,7 +861,33 @@ const App = () => {
         <div className="absolute top-[20%] right-[-10%] w-[40%] h-[60%] bg-violet-900/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] left-[20%] w-[30%] h-[40%] bg-blue-900/10 rounded-full blur-[120px]" />
       </div>
-      <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .recharts-wrapper { outline: none !important; } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }`}</style>
+      
+      {/* Global CSS Styling including dark scrollbar */}
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar { display: none; } 
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } 
+        .recharts-wrapper { outline: none !important; } 
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        /* Global Webkit Scrollbar Styling */
+        ::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #020617; 
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #4338ca; /* Indigo-700 approx */
+          border-radius: 5px;
+          border: 2px solid #020617; /* Creates padding effect */
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #6366f1; /* Indigo-500 */
+        }
+      `}</style>
+      
       <div className="flex h-screen overflow-hidden">
         {sidebarOpen && <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
         <aside className={`fixed z-50 lg:relative h-full w-[280px] lg:w-72 bg-[#020617] border-r border-white/5 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
