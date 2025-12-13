@@ -114,7 +114,6 @@ const getStartDateISO = (range) => {
 };
 
 // Components
-
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -462,19 +461,31 @@ const App = () => {
     } 
   }, [selectedStock, chartRange, fetchChartData, fetchNews, fetchGeminiInsight]);
 
+  // Added Promise.all to wait for all fetches including AI, and added error handling
   const handleRefreshData = async () => { 
       if (isRefreshing) return;
       setIsRefreshing(true);
-      if(selectedStock) {
-        fetchGeminiInsight(selectedStock.code.replace('.JK',''), selectedStock.price, selectedStock.change);
+      
+      try {
+        const promises = [fetchMarketData(), fetchNews(), fetchChartData()];
+        
+        if(selectedStock) {
+            // Include AI insight in the loading process so button spins until everything is ready
+            promises.push(fetchGeminiInsight(selectedStock.code.replace('.JK',''), selectedStock.price, selectedStock.change));
+        }
+        
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Refresh failed:", error);
+      } finally {
+        // Ensure spinner shows for at least 1s for better UX feedback
+        setTimeout(() => setIsRefreshing(false), 1000); 
       }
-      await Promise.all([fetchMarketData(), fetchNews(), fetchChartData()]);
-      setTimeout(() => setIsRefreshing(false), 1000); 
   };
   
   const handleSelectStock = (stock) => { setSelectedStock(stock); setMainView('Dashboard'); setChartRange('1M'); };
   const handleRangeChange = (range) => setChartRange(range);
-  const handleBellClick = () => console.log("Notifikasi diklik");
+  const handleBellClick = () => console.log("Notification clicked");
 
   const volatilityData = useMemo(() => {
       if (!selectedStock) return { volatility: 0, regime: 'N/A', color: 'text-slate-400' };
@@ -494,6 +505,8 @@ const App = () => {
     const neg = newsData.filter(n => n.sentiment === 'negative').length;
     const neu = newsData.filter(n => n.sentiment === 'neutral').length;
     const total = pos + neg + neu || 1;
+    
+    // We keep values as percentages (0-100)
     return [
         { name: 'Positive', value: Math.round((pos/total)*100), color: SENTIMENT_COLORS.positive },
         { name: 'Negative', value: Math.round((neg/total)*100), color: SENTIMENT_COLORS.negative },
@@ -559,7 +572,7 @@ const App = () => {
                         
                         <div className={`${COMMON_CARD_STYLE} flex flex-col justify-between hover:-translate-y-1 h-full min-h-[180px]`}>
                             <div className="flex items-center justify-between w-full mb-4">
-                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">AI Signal</p>
+                                <p className="text-slate-400 text-sm font-semibold tracking-wide">STOCK SIGNAL</p>
                                 <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/10"><Activity size={18} className={priceForecastInterpretation.color.replace('text-', 'text-')} /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
@@ -570,7 +583,7 @@ const App = () => {
 
                         <div className={`${COMMON_CARD_STYLE} flex flex-col justify-between hover:-translate-y-1 h-full min-h-[180px]`}>
                             <div className="flex items-center justify-between w-full mb-4">
-                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Volatility</p>
+                                <p className="text-slate-400 text-sm font-semibold tracking-wide">VOLATILITY</p>
                                 <div className="p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/10"><Wind size={18} className="text-blue-400" /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
@@ -591,7 +604,8 @@ const App = () => {
                                 <div className={`${CARD_PADDING} flex-1 flex flex-col`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
                                         <div>
-                                            <h3 className="text-xl font-bold text-white flex items-center gap-3">{displayCode} Forecast <span className="text-[11px] uppercase font-bold text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-full bg-indigo-500/10 tracking-wider">XGBoost v2</span></h3>
+                                            {/* XGBOOST Badge: Rounded changed to rounded-lg and center alignment added */}
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-3">{displayCode} Forecast <span className="text-[11px] font-bold text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg bg-indigo-500/10 tracking-wider flex items-center justify-center">XGBOOST</span></h3>
                                             <p className="text-sm text-slate-400 mt-2 flex items-center gap-2">
                                                 Current: <span className="text-white font-mono text-base">Rp {selectedStock.price ? selectedStock.price.toLocaleString() : '-'}</span> <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                             </p>
@@ -605,7 +619,7 @@ const App = () => {
                                         </div>
                                     </div>
 
-                                    {/* FIX RECHARTS WIDTH (-1) ERROR: Added Fixed Height Wrapper -> Changed to flex-1 */}
+                                    {/* Fix Recharts width (-1) error: Remove flex-1, replace with fixed height */}
                                     <div className="w-full min-w-0 flex-1 min-h-[300px]"> 
                                         {chartData.length > 0 ? (
                                             <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -732,41 +746,45 @@ const App = () => {
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/10"><Newspaper size={20} className="text-amber-400" /></div>
                                 <h3 className="font-bold text-slate-200 text-base">Sentiment Distribution</h3>
-                                {newsData.length > 0 && <span className="ml-auto text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">{newsData.length} NEWS</span>}
+                                {/* NEWS Badge: Rounded changed to rounded-lg and center alignment added */}
+                                {newsData.length > 0 && <span className="ml-auto text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 flex items-center justify-center">{newsData.length} NEWS</span>}
                             </div>
                             
-                            {/* FIX RECHARTS WIDTH (-1) ERROR: HAPUS FLEX-1, GANTI DENGAN HEIGHT PASTI */}
-                            <div className="w-full min-w-0" style={{ height: '250px' }}>
+                            {/* Revision: Removed fixed height, added flex-1 to fill the card height completely */}
+                            <div className="flex-1 w-full min-h-0 pb-2">
                             {newsData.length > 0 ? (
-                                // PERBAIKAN: Bungkus dengan div relative
-                                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                    <ResponsiveContainer width="99%" height="100%">
-                                        <BarChart data={cnbcSentimentData} margin={{ top: 15, right: 0, left: 0, bottom: 0 }} barSize={40}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                            <XAxis 
-                                                dataKey="name" 
-                                                stroke="#64748b" 
-                                                tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
-                                                tickMargin={12} 
-                                                axisLine={false} 
-                                                tickLine={false}
-                                            />
-                                            <Tooltip 
-                                                cursor={{fill: '#ffffff05'}}
-                                                content={<SentimentTooltip />}
-                                            />
-                                            <Bar 
-                                                dataKey="value" 
-                                                radius={[8, 8, 8, 8]} 
-                                                background={{ fill: '#0f172a', radius: 8 }} 
-                                            >
-                                                {cnbcSentimentData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} className="hover:opacity-80 transition-opacity cursor-pointer"/>
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart 
+                                        data={cnbcSentimentData} 
+                                        margin={{ top: 0, right: 0, left: 0, bottom: 0 }} 
+                                        maxBarSize={50}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                                        <XAxis 
+                                            dataKey="name" 
+                                            stroke="#64748b" 
+                                            tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
+                                            tickMargin={12} 
+                                            axisLine={false} 
+                                            tickLine={false}
+                                        />
+                                        {/* Revision: Changed domain to 'auto' so the tallest bar reaches the top of the chart area */}
+                                        <YAxis hide domain={[0, 'auto']} />
+                                        <Tooltip 
+                                            cursor={{fill: '#ffffff05'}}
+                                            content={<SentimentTooltip />}
+                                        />
+                                        <Bar 
+                                            dataKey="value" 
+                                            radius={[8, 8, 8, 8]} 
+                                            background={{ fill: 'rgba(255, 255, 255, 0.05)', radius: [8, 8, 8, 8] }} 
+                                        >
+                                            {cnbcSentimentData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} className="hover:opacity-80 transition-opacity cursor-pointer"/>
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
                             ) : (
                                 <div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/2">
                                     <p className="text-slate-500 text-xs font-medium">No sentiment data available.</p>
@@ -779,7 +797,7 @@ const App = () => {
                         <div className={`${SECONDARY_CARD_STYLE} flex flex-col`}>
                             <div className="flex justify-between items-center mb-4 shrink-0"><h3 className="font-bold text-slate-200 text-lg truncate mr-2">Latest News</h3><button onClick={() => setMainView('Full News Feed')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 whitespace-nowrap bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">VIEW ALL</button></div>
                             
-                            <div className="flex-1 overflow-hidden flex flex-col gap-4"> 
+                            <div className="flex-1 overflow-hidden flex flex-col gap-4 justify-end pb-1">
                                 {newsData.length === 0 ? (
                                     <div className="flex-1 flex flex-col items-center justify-center opacity-70">
                                         <FileText size={32} className="text-slate-600 mb-2"/>
@@ -790,14 +808,13 @@ const App = () => {
                                         <div key={news.id} className="group relative pl-4 border-l-2 border-white/5 hover:border-indigo-500 transition-colors shrink-0">
                                             <div className="flex justify-between items-start mb-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{news.source || 'News'}</span>
-                                                <span className={`w-2 h-2 rounded-full ${news.sentiment === 'positive' ? 'bg-emerald-500' : news.sentiment === 'negative' ? 'bg-rose-500' : 'bg-slate-500'}`}></span>
+                                                <span className={`w-2 h-2 rounded-full ${news.sentiment === 'positive' ? 'bg-emerald-500' : news.sentiment === 'negative' ? 'bg-rose-500' : 'bg-violet-500'}`}></span>
                                             </div>
                                             <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug hover:text-indigo-400 transition-colors line-clamp-2 block mb-1">{news.title}</a>
                                             <span className="text-[10px] text-slate-600">{news.time}</span>
                                         </div>
                                     ))
                                 )}
-                                {newsData.length > 0 && newsData.length < 3 && <div className="flex-1"></div>}
                             </div>
                         </div>
 
@@ -846,8 +863,8 @@ const App = () => {
             <div className="flex items-center gap-4"><button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 text-slate-400 hover:text-white"><Menu size={24} /></button><h2 className="text-xl font-bold text-white hidden md:block tracking-tight">{mainView === 'Dashboard' ? 'IndoStockAI Dashboard' : mainView}</h2><h2 className="text-base font-bold text-white md:hidden">{mainView === 'Dashboard' ? 'Dashboard' : mainView}</h2></div>
             <div className="flex items-center gap-3 sm:gap-6">
                 <div className="hidden sm:flex flex-col items-end mr-2">
-                    <span className="text-sm font-bold text-white">Group 2</span>
-                    <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase tracking-wider">PRO MEMBER</span>
+                    <span className="text-sm font-bold text-white">Group 2 - Big Data Analysis</span>
+                    <span className="text-[10px] text-indigo-400 font-mono font-bold tracking-wider">PRO MEMBER</span>
                 </div>
                 <button onClick={handleBellClick} className="relative p-2.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"><Bell size={20} /><span className="absolute top-2.5 right-3 w-2 h-2 bg-rose-500 rounded-full shadow-[0_0_8px_#f43f5e] animate-pulse"></span></button>
                 <div className="h-10 w-10 rounded-full bg-linear-to-tr from-indigo-500 to-violet-500 p-0.5 shadow-lg shadow-indigo-500/20 cursor-pointer hover:scale-105 transition-transform"><div className="h-full w-full rounded-full bg-[#020617] flex items-center justify-center"><User size={20} className="text-white" /></div></div>
