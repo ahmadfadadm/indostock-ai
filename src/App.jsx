@@ -11,17 +11,21 @@ import {
   Sparkles, Bot, BrainCircuit
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
-import { getGeminiInsight } from './gemini'; // IMPORT BARU
+import { getGeminiInsight } from './gemini';
 
-// --- STRICT SPACING SYSTEM (PIXEL PERFECT) ---
+// Strict spacing system
 const LAYOUT_PX = "px-6 lg:px-8"; 
 const LAYOUT_GAP = "gap-6 lg:gap-8"; 
 const CARD_PADDING = "p-6"; 
 
-// --- STYLE UPDATES ---
+// Style updates
 const COMMON_CARD_STYLE = `bg-[#111827]/60 backdrop-blur-2xl border border-white/5 rounded-3xl ${CARD_PADDING} shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 transition-all duration-300 group relative overflow-hidden`;
 
 const UNIFIED_CARD_HEIGHT = "h-[400px]"; 
+
+// New Card Variant Layers
+const PRIMARY_CARD_STYLE = `${COMMON_CARD_STYLE} h-full`; // For Chart & Top Movers
+const SECONDARY_CARD_STYLE = `${COMMON_CARD_STYLE} ${UNIFIED_CARD_HEIGHT}`; // For AI, Sentiment, & News
 
 const COMPANY_META = {
   'BBCA.JK': { name: 'Bank Central Asia Tbk', type: 'Finance' },
@@ -54,7 +58,7 @@ const SENTIMENT_COLORS = {
 
 const CHART_RANGES = ['5D', '1M', '6M', 'YTD', '1Y'];
 
-// --- HELPER FUNCTIONS ---
+// Helper functions
 const StockLogo = ({ code, className = "w-8 h-8", fallbackClass = "" }) => {
     const [imgError, setImgError] = useState(false);
     const cleanCode = code ? code.replace('.JK', '') : 'XX';
@@ -77,15 +81,16 @@ const StockLogo = ({ code, className = "w-8 h-8", fallbackClass = "" }) => {
     );
 };
 
-const getIndoMonth = (monthIndex) => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+const getMonthName = (monthIndex) => {
+    // English months
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[monthIndex % 12];
 };
 
 const formatFullDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return `${date.getDate()} ${getIndoMonth(date.getMonth())} ${date.getFullYear()}`;
+    return `${date.getDate()} ${getMonthName(date.getMonth())} ${date.getFullYear()}`;
 };
 
 const getStartDateISO = (range) => {
@@ -108,13 +113,14 @@ const getStartDateISO = (range) => {
     return `${year}-${month}-${day}`;
 };
 
-// --- COMPONENTS ---
+// Components
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#0f172a]/95 border border-slate-700/50 p-4 rounded-2xl shadow-2xl backdrop-blur-md">
-          <p className="text-slate-400 text-xs mb-2 font-medium border-b border-white/5 pb-2">{new Date(label).toLocaleDateString('id-ID', { dateStyle: 'full' })}</p>
+        <div className="bg-[#0f172a]/95 border border-slate-700/50 p-4 rounded-2xl shadow-2xl backdrop-blur-md z-50">
+          {/* English date format */}
+          <p className="text-slate-400 text-xs mb-2 font-medium border-b border-white/5 pb-2">{new Date(label).toLocaleDateString('en-US', { dateStyle: 'full' })}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-3 text-sm mb-1 last:mb-0">
                 <span className="w-2 h-2 rounded-full shadow-[0_0_8px]" style={{ backgroundColor: entry.color, boxShadow: `0 0 8px ${entry.color}` }}></span>
@@ -132,7 +138,7 @@ const SentimentTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
         const data = payload[0];
         return (
-            <div className="bg-[#0f172a] border border-slate-700 p-3 rounded-xl shadow-xl">
+            <div className="bg-[#0f172a] border border-slate-700 p-3 rounded-xl shadow-xl z-50">
                  <p className="text-white font-bold text-sm mb-1" style={{ color: data.payload.color }}>
                     {data.payload.name}
                  </p>
@@ -190,7 +196,7 @@ const SentimentBadge = ({ sentiment }) => {
 };
 
 const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
-  if (!stockList || stockList.length === 0) return <div className="p-4 text-slate-500 text-sm animate-pulse">Menunggu data pasar...</div>;
+  if (!stockList || stockList.length === 0) return <div className="p-4 text-slate-500 text-sm animate-pulse">Waiting for market data...</div>;
 
   return (
     <div className="-mx-6 lg:-mx-8">
@@ -250,7 +256,7 @@ const FullNewsFeed = ({ newsData, selectedCode }) => (
             {newsData.length === 0 ? 
             <div className="flex flex-col items-center justify-center p-12 border border-dashed border-white/10 rounded-xl bg-white/2">
                 <FileText size={40} className="text-slate-600 mb-3" />
-                <p className="text-slate-400 font-medium">Belum ada berita untuk {selectedCode}</p>
+                <p className="text-slate-400 font-medium">No news available for {selectedCode}</p>
             </div> : 
             newsData.map((news) => (
                 <div key={news.id} className="group p-5 bg-white/2 rounded-2xl hover:bg-white/5 transition-all border border-white/5 hover:border-white/10 relative">
@@ -288,22 +294,22 @@ const App = () => {
   const [chartRange, setChartRange] = useState('1M');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // --- STATE UNTUK AI ---
+  // State for AI
   const [aiAnalysis, setAiAnalysis] = useState({ 
-    text: "Menunggu sinyal pasar...", 
-    upside: "Calculating...", 
-    sentiment: "Neutral" 
+    text: "Waiting for market signals...", 
+    upside: "", 
+    sentiment: "" 
   });
   const [typedText, setTypedText] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // --- LOGIC TYPEWRITER EFFECT ---
+  // Logic for typewriter effect
   useEffect(() => {
     if (!aiAnalysis.text) return;
     
     let i = 0;
     setTypedText(""); 
-    const speed = 20; // Dipercepat sedikit agar lebih responsif
+    const speed = 20; 
     
     const intervalId = setInterval(() => {
       setTypedText((prev) => {
@@ -319,27 +325,26 @@ const App = () => {
     return () => clearInterval(intervalId);
   }, [aiAnalysis.text]);
 
-  // --- UPDATE LOGIC AI PAKE FILE LOKAL src/gemini.js ---
   const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
     setIsAiLoading(true);
     setTypedText("");
-
+    
     try {
-        // Panggil fungsi langsung, bukan fetch ke /api
         const data = await getGeminiInsight(stockCode, price, change);
 
-        setAiAnalysis({
-            text: data.summary,
-            upside: data.upside,
-            sentiment: data.sentiment,
-        });
-
+        if (data) {
+            setAiAnalysis({
+                text: data.summary || "Data not available.",
+                upside: "",
+                sentiment: "",
+            });
+        }
     } catch (error) {
         console.error("AI Error:", error);
         setAiAnalysis({
-            text: `Mode offline: AI tidak dapat diakses saat ini.`,
-            upside: "N/A",
-            sentiment: "Neutral",
+            text: `Offline mode: AI connection lost.`,
+            upside: "",
+            sentiment: "",
         });
     } finally {
         setIsAiLoading(false);
@@ -348,35 +353,30 @@ const App = () => {
 
   const customTicks = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
+    
+    const len = chartData.length;
+
+    // 5D: 3 ticks, middle focused, no edges
     if (chartRange === '5D') {
-        const len = chartData.length;
-        if (len < 3) return chartData.map(d => d.rawDate);
-        const idx1 = Math.floor(len * 0.2); 
-        const idx2 = Math.floor(len * 0.5); 
-        const idx3 = Math.floor(len * 0.8);
-        return [chartData[idx1].rawDate, chartData[idx2].rawDate, chartData[idx3].rawDate];
+        if (len < 5) return [];
+        const t1 = Math.floor(len * 0.25);
+        const t2 = Math.floor(len * 0.50);
+        const t3 = Math.floor(len * 0.75);
+        return [chartData[t1].rawDate, chartData[t2].rawDate, chartData[t3].rawDate];
     }
+    
+    // 1M: 4 ticks, evenly distributed, no edges
     if (chartRange === '1M') {
-        const count = chartData.length;
-        if (count < 5) return chartData.map(d => d.rawDate);
-        const indices = [Math.floor(count * 0.20), Math.floor(count * 0.40), Math.floor(count * 0.60), Math.floor(count * 0.80)];
-        let monthChangeIndex = -1;
-        for (let i = 1; i < count; i++) {
-            const prev = new Date(chartData[i-1].rawDate);
-            const curr = new Date(chartData[i].rawDate);
-            if (prev.getMonth() !== curr.getMonth()) { monthChangeIndex = i; break; }
-        }
-        if (monthChangeIndex !== -1) {
-            let closestDist = Infinity;
-            let replaceIdx = -1;
-            indices.forEach((idx, arrIdx) => {
-                const dist = Math.abs(idx - monthChangeIndex);
-                if (dist < closestDist) { closestDist = dist; replaceIdx = arrIdx; }
-            });
-            if (replaceIdx !== -1) indices[replaceIdx] = monthChangeIndex;
-        }
-        return [...new Set(indices)].sort((a, b) => a - b).map(i => chartData[i].rawDate);
+        if (len < 5) return [];
+        const t1 = Math.floor(len * 0.20);
+        const t2 = Math.floor(len * 0.40);
+        const t3 = Math.floor(len * 0.60);
+        const t4 = Math.floor(len * 0.80);
+        const indices = [...new Set([t1, t2, t3, t4])].sort((a, b) => a - b);
+        return indices.map(i => chartData[i].rawDate);
     }
+
+    // Default for other ranges (keep as is or modify if needed)
     const ticks = [];
     let lastMonth = -1;
     let lastYear = -1;
@@ -446,7 +446,7 @@ const App = () => {
         setNewsData(data.map(n => ({
             id: n.id, title: n.title, url: n.url, 
             source: n.url ? new URL(n.url).hostname.replace('www.', '') : 'News',
-            time: n.published_at ? new Date(n.published_at).toLocaleDateString('id-ID') : '',
+            time: n.published_at ? new Date(n.published_at).toLocaleDateString('en-US') : '',
             sentiment: n.sentiment, code: n.code, score: n.score
         })));
     }
@@ -466,7 +466,6 @@ const App = () => {
       if (isRefreshing) return;
       setIsRefreshing(true);
       if(selectedStock) {
-        // Refresh AI juga
         fetchGeminiInsight(selectedStock.code.replace('.JK',''), selectedStock.price, selectedStock.change);
       }
       await Promise.all([fetchMarketData(), fetchNews(), fetchChartData()]);
@@ -496,9 +495,9 @@ const App = () => {
     const neu = newsData.filter(n => n.sentiment === 'neutral').length;
     const total = pos + neg + neu || 1;
     return [
-        { name: 'Positif', value: Math.round((pos/total)*100), color: SENTIMENT_COLORS.positive },
-        { name: 'Negatif', value: Math.round((neg/total)*100), color: SENTIMENT_COLORS.negative },
-        { name: 'Netral', value: Math.round((neu/total)*100), color: SENTIMENT_COLORS.neutral },
+        { name: 'Positive', value: Math.round((pos/total)*100), color: SENTIMENT_COLORS.positive },
+        { name: 'Negative', value: Math.round((neg/total)*100), color: SENTIMENT_COLORS.negative },
+        { name: 'Neutral', value: Math.round((neu/total)*100), color: SENTIMENT_COLORS.neutral },
     ];
   }, [selectedStock, newsData]);
 
@@ -539,7 +538,7 @@ const App = () => {
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
                         <div>
                             <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                Detail Emiten 
+                                Issuer Details 
                                 <span className="text-indigo-400 bg-indigo-500/10 px-3 py-0.5 rounded-xl border border-indigo-500/20 text-2xl">{displayCode}</span>
                             </h2>
                             <p className="text-base text-slate-400 font-medium flex items-center gap-2">
@@ -571,7 +570,7 @@ const App = () => {
 
                         <div className={`${COMMON_CARD_STYLE} flex flex-col justify-between hover:-translate-y-1 h-full min-h-[180px]`}>
                             <div className="flex items-center justify-between w-full mb-4">
-                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Volatilitas</p>
+                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Volatility</p>
                                 <div className="p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/10"><Wind size={18} className="text-blue-400" /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
@@ -583,11 +582,12 @@ const App = () => {
                         <MetricCard title="Top Gainer" value={<div className="flex items-center gap-3"><div className="w-8 h-8 shrink-0"><StockLogo code={topMovers[0]?.code || 'GOTO'} className="w-full h-full" /></div><span>{topMovers[0]?.code.replace('.JK', '') || 'GOTO'}</span></div>} change={topMovers[0]?.change || 0} icon={TrendingUp} subLabel="vs Prev Close" />
                     </div>
 
-                    {/* Chart & Sidebar Grid */}
+                    {/* NEW STRUCTURE: Primary Row (Chart + Movers) */}
                     <div className={`grid grid-cols-1 lg:grid-cols-12 ${LAYOUT_GAP}`}>
-                        {/* Main Chart Column */}
-                        <div className={`lg:col-span-8 flex flex-col ${LAYOUT_GAP}`}>
-                            <div className={`${COMMON_CARD_STYLE} p-1`}> 
+                        
+                        {/* Main Chart Column (Span 8) */}
+                        <div className="lg:col-span-8">
+                            <div className={`${PRIMARY_CARD_STYLE} p-1`}> 
                                 <div className={`${CARD_PADDING}`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
                                         <div>
@@ -605,196 +605,203 @@ const App = () => {
                                         </div>
                                     </div>
 
-                                    <div className="h-[300px] sm:h-[400px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 10 }}> 
-                                            <defs>
-                                                <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient>
-                                                <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                            
-                                            <XAxis 
-                                                dataKey="rawDate" 
-                                                stroke="#475569" 
-                                                tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} 
-                                                axisLine={false}
-                                                tickLine={false}
-                                                minTickGap={20}
-                                                padding={{ left: 0, right: 0 }} 
-                                                tickMargin={16}
-                                                ticks={customTicks}
-                                                interval={customTicks ? 0 : 'preserveStartEnd'} 
-                                                tickFormatter={(value) => {
-                                                    const date = new Date(value);
-                                                    if (chartRange === '5D') return `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'short' })}`;
-                                                    if (chartRange === '1M') {
-                                                        if (date.getDate() <= 7) return `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'short' })}`;
-                                                        return date.getDate(); 
-                                                    }
-                                                    if (chartRange === '6M') return date.toLocaleDateString('id-ID', { month: 'short' });
-                                                    if (chartRange === 'YTD') return date.toLocaleDateString('id-ID', { month: 'short' });
-                                                    if (chartRange === '1Y') {
-                                                        if (date.getMonth() === 0) return date.getFullYear();
-                                                        return date.toLocaleDateString('id-ID', { month: 'short' });
-                                                    }
-                                                    return `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'short' })}`;
-                                                }}
-                                            />
-                                            
-                                            <YAxis stroke="#475569" tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} axisLine={false} tickLine={false} tickFormatter={(value) => `${(value/1000).toFixed(1)}k`} tickMargin={16} domain={['auto', 'auto']} />
-                                            
-                                            <Tooltip content={<CustomTooltip />} />
-                                            
-                                            <Area type="monotone" dataKey="price" stroke="#818cf8" strokeWidth={3} fillOpacity={1} fill="url(#colorHistory)" dot={false} connectNulls={true} activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }}/>
-                                            <Area type="monotone" dataKey="forecast" stroke="#34d399" strokeDasharray="5 5" strokeWidth={3} fillOpacity={1} fill="url(#colorForecast)" dot={false} connectNulls={true} activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }}/>
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Secondary Stats Grid */}
-                            <div className={`grid grid-cols-1 md:grid-cols-2 ${LAYOUT_GAP}`}>
-                                {/* AI Analysis Card (UPDATED - CLEAN VERSION) */}
-                                <div className={`${COMMON_CARD_STYLE} ${UNIFIED_CARD_HEIGHT} flex flex-col relative overflow-hidden group border-indigo-500/30`}>
-                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all duration-700"></div>
-                                    
-                                    <div className="flex items-center justify-between mb-4 relative z-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-linear-to-br from-indigo-500 to-violet-600 rounded-lg shadow-lg shadow-indigo-500/20">
-                                                <BrainCircuit size={20} className="text-white" />
+                                    {/* FIX RECHARTS WIDTH (-1) ERROR: Added Fixed Height Wrapper */}
+                                    <div className="w-full min-w-0" style={{ height: '300px' }}>
+                                        {/* Fix: Use wrapper with fixed height */}
+                                        {chartData.length > 0 ? (
+                                            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                                <ResponsiveContainer width="99%" height="100%">
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 10 }}> 
+                                                    <defs>
+                                                        <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient>
+                                                        <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                    
+                                                    <XAxis 
+                                                        dataKey="rawDate" 
+                                                        stroke="#475569" 
+                                                        tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} 
+                                                        axisLine={false} 
+                                                        tickLine={false} 
+                                                        minTickGap={20} 
+                                                        padding={{ left: 0, right: 0 }} 
+                                                        tickMargin={16} 
+                                                        ticks={customTicks} 
+                                                        interval={customTicks ? 0 : 'preserveStartEnd'} 
+                                                        tickFormatter={(value) => {
+                                                            const date = new Date(value);
+                                                            if (chartRange === '5D') return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })}`;
+                                                            if (chartRange === '1M') {
+                                                                if (date.getDate() <= 7) return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })}`;
+                                                                return date.getDate(); 
+                                                            }
+                                                            if (chartRange === '6M') return date.toLocaleDateString('en-US', { month: 'short' });
+                                                            if (chartRange === 'YTD') return date.toLocaleDateString('en-US', { month: 'short' });
+                                                            if (chartRange === '1Y') {
+                                                                if (date.getMonth() === 0) return date.getFullYear();
+                                                                return date.toLocaleDateString('en-US', { month: 'short' });
+                                                            }
+                                                            return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })}`;
+                                                        }}
+                                                    />
+                                                    
+                                                    <YAxis stroke="#475569" tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} axisLine={false} tickLine={false} tickFormatter={(value) => `${(value/1000).toFixed(1)}k`} tickMargin={16} domain={['auto', 'auto']} />
+                                                    
+                                                    <Tooltip content={<CustomTooltip />} />
+                                                    
+                                                    <Area type="monotone" dataKey="price" stroke="#818cf8" strokeWidth={3} fillOpacity={1} fill="url(#colorHistory)" dot={false} connectNulls={true} activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }}/>
+                                                    <Area type="monotone" dataKey="forecast" stroke="#34d399" strokeDasharray="5 5" strokeWidth={3} fillOpacity={1} fill="url(#colorForecast)" dot={false} connectNulls={true} activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }}/>
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
                                             </div>
-                                            <h3 className="font-bold text-white text-lg tracking-tight">AI Market Insight</h3>
-                                        </div>
-                                        <div className="px-2 py-1 rounded-md bg-indigo-950/50 border border-indigo-500/30 flex items-center gap-1.5">
-                                            <Sparkles size={12} className={`text-indigo-400 ${isAiLoading ? 'animate-spin' : 'animate-pulse'}`}/>
-                                            <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Gemini</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex-1 bg-[#0b0f19]/80 rounded-xl border border-white/5 p-4 relative overflow-hidden flex flex-col justify-start overflow-y-auto custom-scrollbar">
-                                        <div className="space-y-3">
-                                            <div className="flex gap-2">
-                                                <div className={`w-1 shrink-0 bg-indigo-500 rounded-full ${isAiLoading ? 'animate-pulse h-full' : 'h-12'}`}></div>
-                                                <div className="flex-1">
-                                                    <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                                                        {isAiLoading ? (
-                                                            <span className="animate-pulse text-slate-500">Sedang menganalisis data pasar real-time...</span>
-                                                        ) : (
-                                                            <>
-                                                                {typedText}
-                                                                <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-400 animate-pulse align-middle"></span>
-                                                            </>
-                                                        )}
-                                                    </p>
-                                                    {/* Tambahan Info Upside dari AI */}
-                                                    {!isAiLoading && aiAnalysis.upside !== 'N/A' && (
-                                                        <div className="mt-3 flex gap-2">
-                                                            <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-1 rounded border border-indigo-500/20">
-                                                                Upside: {aiAnalysis.upside}
-                                                            </span>
-                                                            <span className={`text-[10px] px-2 py-1 rounded border ${aiAnalysis.sentiment.toLowerCase() === 'positive' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
-                                                                {aiAnalysis.sentiment}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center text-slate-500 animate-pulse">
+                                                Loading chart data...
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Sentiment Chart */}
-                                <div className={`${COMMON_CARD_STYLE} ${UNIFIED_CARD_HEIGHT} flex flex-col`}>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/10"><Newspaper size={20} className="text-amber-400" /></div>
-                                        <h3 className="font-bold text-slate-200 text-base">Distribusi Sentimen</h3>
-                                        {newsData.length > 0 && <span className="ml-auto text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">{newsData.length} NEWS</span>}
-                                    </div>
-                                    
-                                    <div className="flex-1 w-full">
-                                    {newsData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={cnbcSentimentData} margin={{ top: 15, right: 0, left: 0, bottom: 0 }} barSize={40}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                                <XAxis 
-                                                    dataKey="name" 
-                                                    stroke="#64748b" 
-                                                    tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
-                                                    tickMargin={12} 
-                                                    axisLine={false} 
-                                                    tickLine={false}
-                                                />
-                                                <Tooltip 
-                                                    cursor={{fill: '#ffffff05'}}
-                                                    content={<SentimentTooltip />}
-                                                />
-                                                <Bar 
-                                                    dataKey="value" 
-                                                    radius={[8, 8, 8, 8]} 
-                                                    background={{ fill: '#0f172a', radius: 8 }} 
-                                                >
-                                                    {cnbcSentimentData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} className="hover:opacity-80 transition-opacity cursor-pointer"/>
-                                                    ))}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/2">
-                                            <p className="text-slate-500 text-xs font-medium">Belum ada data sentimen.</p>
-                                        </div>
-                                    )}
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Sidebar Column */}
-                        <div className={`lg:col-span-4 flex flex-col ${LAYOUT_GAP}`}>
-                            {/* Market Movers */}
-                            <div className={`${COMMON_CARD_STYLE}`}>
+                        {/* Market Movers Column (Span 4) */}
+                        <div className="lg:col-span-4">
+                            <div className={`${PRIMARY_CARD_STYLE}`}>
                                 <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-slate-200 text-lg">Top Movers (Real)</h3><button onClick={() => setMainView('All Market Movers')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">SCREENER <ChevronRight size={12}/></button></div>
                                 <div className="space-y-3">
                                 {topMovers.slice(0, 5).map((stock) => {
                                     const isGainer = stock.change >= 0;
                                     return (
                                     <div key={stock.code} className={`flex justify-between items-center p-3.5 rounded-xl transition-all cursor-pointer border border-transparent ${stock.code === selectedStock.code ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10' : 'hover:bg-white/5 hover:border-white/5'}`} onClick={() => handleSelectStock(stock)}>
-                                        <div className="flex items-center gap-3"><div className={`w-10 h-10 flex items-center justify-center shrink-0 ${isGainer ? 'shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)] rounded-full ring-1 ring-emerald-500/20' : 'shadow-[0_0_15px_-3px_rgba(244,63,94,0.3)] rounded-full ring-1 ring-rose-500/20'}`}><StockLogo code={stock.code} className="w-full h-full" /></div><div><p className="font-black text-sm text-white tracking-wide">{stock.code.replace('.JK', '')}</p><p className="text-[10px] sm:text-xs text-slate-400 font-mono">Rp {stock.price ? stock.price.toLocaleString() : '-'}</p></div></div>
+                                            <div className="flex items-center gap-3"><div className={`w-10 h-10 flex items-center justify-center shrink-0 ${isGainer ? 'shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)] rounded-full ring-1 ring-emerald-500/20' : 'shadow-[0_0_15px_-3px_rgba(244,63,94,0.3)] rounded-full ring-1 ring-rose-500/20'}`}><StockLogo code={stock.code} className="w-full h-full" /></div><div><p className="font-black text-sm text-white tracking-wide">{stock.code.replace('.JK', '')}</p><p className="text-[10px] sm:text-xs text-slate-400 font-mono">Rp {stock.price ? stock.price.toLocaleString() : '-'}</p></div></div>
                                             <div className={`text-sm font-bold flex items-center ${isGainer ? 'text-emerald-400' : 'text-rose-400'}`}>{stock.change > 0 ? '+' : ''}{stock.change ? stock.change.toFixed(2) : '0.00'}%{isGainer ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} className="mr-0.5" />}</div>
                                     </div>
                                     );
                                 })}
                                 </div>
                             </div>
+                        </div>
 
-                            {/* News Feed Mini */}
-                            <div className={`${COMMON_CARD_STYLE} ${UNIFIED_CARD_HEIGHT} flex flex-col`}>
-                                <div className="flex justify-between items-center mb-4 shrink-0"><h3 className="font-bold text-slate-200 text-lg truncate mr-2">Berita Terkini</h3><button onClick={() => setMainView('Full News Feed')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 whitespace-nowrap bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">LIHAT SEMUA</button></div>
-                                
-                                <div className="flex-1 overflow-hidden flex flex-col gap-4"> 
-                                    {newsData.length === 0 ? (
-                                        <div className="flex-1 flex flex-col items-center justify-center opacity-70">
-                                            <FileText size={32} className="text-slate-600 mb-2"/>
-                                            <p className="text-slate-500 text-xs text-center">Belum ada berita terkini<br/>untuk {displayCode}.</p>
+                    </div>
+                    
+                    {/* NEW STRUCTURE: Secondary Row (AI + Sentiment + News) */}
+                    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${LAYOUT_GAP}`}>
+                        
+                        {/* AI Analysis Card */}
+                        <div className={`${SECONDARY_CARD_STYLE} flex flex-col relative overflow-hidden group border-indigo-500/30`}>
+                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all duration-700"></div>
+                            
+                            <div className="flex items-center justify-between mb-4 relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-linear-to-br from-indigo-500 to-violet-600 rounded-lg shadow-lg shadow-indigo-500/20">
+                                        <BrainCircuit size={20} className="text-white" />
+                                    </div>
+                                    <h3 className="font-bold text-white text-lg tracking-tight">AI Market Insight</h3>
+                                </div>
+                                <div className="px-2 py-1 rounded-md bg-indigo-950/50 border border-indigo-500/30 flex items-center gap-1.5">
+                                    <Sparkles size={12} className={`text-indigo-400 ${isAiLoading ? 'animate-spin' : 'animate-pulse'}`}/>
+                                    <span className="text-[10px] font-bold text-indigo-300 tracking-wider">GEMINI</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex-1 bg-[#0b0f19]/80 rounded-xl border border-white/5 p-4 relative overflow-hidden flex flex-col justify-start overflow-y-auto custom-scrollbar">
+                                <div className="space-y-3">
+                                    <div className="flex gap-2">
+                                        {/* Left Bar: self-stretch to match text height */}
+                                        <div className={`w-1 rounded-full bg-indigo-500 self-stretch shrink-0 ${isAiLoading ? 'animate-pulse' : ''}`}></div>
+                                        <div className="flex-1">
+                                            <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                                                {isAiLoading ? (
+                                                    <span className="animate-pulse text-slate-500">Analyzing real-time market data...</span>
+                                                ) : (
+                                                    <>
+                                                        {typedText}
+                                                        {/* Cursor: thinner w-0.5 */}
+                                                        <span className="inline-block w-0.5 h-4 ml-1 bg-indigo-400 animate-pulse align-middle"></span>
+                                                    </>
+                                                )}
+                                            </p>
                                         </div>
-                                    ) : (
-                                        newsData.slice(0, 3).map((news) => (
-                                            <div key={news.id} className="group relative pl-4 border-l-2 border-white/5 hover:border-indigo-500 transition-colors shrink-0">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{news.source || 'News'}</span>
-                                                    <span className={`w-2 h-2 rounded-full ${news.sentiment === 'positive' ? 'bg-emerald-500' : news.sentiment === 'negative' ? 'bg-rose-500' : 'bg-slate-500'}`}></span>
-                                                </div>
-                                                <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug hover:text-indigo-400 transition-colors line-clamp-2 block mb-1">{news.title}</a>
-                                                <span className="text-[10px] text-slate-600">{news.time}</span>
-                                            </div>
-                                        ))
-                                    )}
-                                    {newsData.length > 0 && newsData.length < 3 && <div className="flex-1"></div>}
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* Sentiment Chart */}
+                        <div className={`${SECONDARY_CARD_STYLE} flex flex-col`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/10"><Newspaper size={20} className="text-amber-400" /></div>
+                                <h3 className="font-bold text-slate-200 text-base">Sentiment Distribution</h3>
+                                {newsData.length > 0 && <span className="ml-auto text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">{newsData.length} NEWS</span>}
+                            </div>
+                            
+                            {/* FIX RECHARTS WIDTH (-1) ERROR: HAPUS FLEX-1, GANTI DENGAN HEIGHT PASTI */}
+                            <div className="w-full min-w-0" style={{ height: '250px' }}>
+                            {newsData.length > 0 ? (
+                                // PERBAIKAN: Bungkus dengan div relative
+                                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                                    <ResponsiveContainer width="99%" height="100%">
+                                        <BarChart data={cnbcSentimentData} margin={{ top: 15, right: 0, left: 0, bottom: 0 }} barSize={40}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                                            <XAxis 
+                                                dataKey="name" 
+                                                stroke="#64748b" 
+                                                tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
+                                                tickMargin={12} 
+                                                axisLine={false} 
+                                                tickLine={false}
+                                            />
+                                            <Tooltip 
+                                                cursor={{fill: '#ffffff05'}}
+                                                content={<SentimentTooltip />}
+                                            />
+                                            <Bar 
+                                                dataKey="value" 
+                                                radius={[8, 8, 8, 8]} 
+                                                background={{ fill: '#0f172a', radius: 8 }} 
+                                            >
+                                                {cnbcSentimentData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} className="hover:opacity-80 transition-opacity cursor-pointer"/>
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/2">
+                                    <p className="text-slate-500 text-xs font-medium">No sentiment data available.</p>
+                                </div>
+                            )}
+                            </div>
+                        </div>
+
+                        {/* News Feed Mini */}
+                        <div className={`${SECONDARY_CARD_STYLE} flex flex-col`}>
+                            <div className="flex justify-between items-center mb-4 shrink-0"><h3 className="font-bold text-slate-200 text-lg truncate mr-2">Latest News</h3><button onClick={() => setMainView('Full News Feed')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 whitespace-nowrap bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">VIEW ALL</button></div>
+                            
+                            <div className="flex-1 overflow-hidden flex flex-col gap-4"> 
+                                {newsData.length === 0 ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center opacity-70">
+                                        <FileText size={32} className="text-slate-600 mb-2"/>
+                                        <p className="text-slate-500 text-xs text-center">No latest news available for {displayCode}.</p>
+                                    </div>
+                                ) : (
+                                    newsData.slice(0, 3).map((news) => (
+                                        <div key={news.id} className="group relative pl-4 border-l-2 border-white/5 hover:border-indigo-500 transition-colors shrink-0">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{news.source || 'News'}</span>
+                                                <span className={`w-2 h-2 rounded-full ${news.sentiment === 'positive' ? 'bg-emerald-500' : news.sentiment === 'negative' ? 'bg-rose-500' : 'bg-slate-500'}`}></span>
+                                            </div>
+                                            <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug hover:text-indigo-400 transition-colors line-clamp-2 block mb-1">{news.title}</a>
+                                            <span className="text-[10px] text-slate-600">{news.time}</span>
+                                        </div>
+                                    ))
+                                )}
+                                {newsData.length > 0 && newsData.length < 3 && <div className="flex-1"></div>}
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             );
@@ -840,7 +847,7 @@ const App = () => {
             <div className="flex items-center gap-4"><button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 text-slate-400 hover:text-white"><Menu size={24} /></button><h2 className="text-xl font-bold text-white hidden md:block tracking-tight">{mainView === 'Dashboard' ? 'IndoStockAI Dashboard' : mainView}</h2><h2 className="text-base font-bold text-white md:hidden">{mainView === 'Dashboard' ? 'Dashboard' : mainView}</h2></div>
             <div className="flex items-center gap-3 sm:gap-6">
                 <div className="hidden sm:flex flex-col items-end mr-2">
-                    <span className="text-sm font-bold text-white">Kelompok 2</span>
+                    <span className="text-sm font-bold text-white">Group 2</span>
                     <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase tracking-wider">PRO MEMBER</span>
                 </div>
                 <button onClick={handleBellClick} className="relative p-2.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"><Bell size={20} /><span className="absolute top-2.5 right-3 w-2 h-2 bg-rose-500 rounded-full shadow-[0_0_8px_#f43f5e] animate-pulse"></span></button>
