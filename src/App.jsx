@@ -299,6 +299,10 @@ const App = () => {
     upside: "", 
     sentiment: "" 
   });
+  
+  // Cache to store AI insights by stock code
+  const [aiCache, setAiCache] = useState({});
+
   const [typedText, setTypedText] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
@@ -324,7 +328,14 @@ const App = () => {
     return () => clearInterval(intervalId);
   }, [aiAnalysis.text]);
 
+  // Modified: Check cache before fetching
   const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
+    // Check if data exists in cache
+    if (aiCache[stockCode]) {
+        setAiAnalysis(aiCache[stockCode]);
+        return;
+    }
+
     setIsAiLoading(true);
     setTypedText("");
     
@@ -332,11 +343,20 @@ const App = () => {
         const data = await getGeminiInsight(stockCode, price, change);
 
         if (data) {
-            setAiAnalysis({
+            const result = {
                 text: data.summary || "Data not available.",
                 upside: "",
                 sentiment: "",
-            });
+            };
+            
+            // Update current state
+            setAiAnalysis(result);
+            
+            // Update cache
+            setAiCache(prev => ({
+                ...prev,
+                [stockCode]: result
+            }));
         }
     } catch (error) {
         console.error("AI Error:", error);
@@ -348,7 +368,7 @@ const App = () => {
     } finally {
         setIsAiLoading(false);
     }
-  }, []);
+  }, [aiCache]); // Dependency updated to include cache
 
   const customTicks = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
@@ -471,6 +491,8 @@ const App = () => {
         
         if(selectedStock) {
             // Include AI insight in the loading process so button spins until everything is ready
+            // Note: We might want to force refresh here (ignore cache) if the user explicitly clicked "Update Data"
+            // For now, it respects the cache logic in fetchGeminiInsight unless we modify it to accept a 'force' param
             promises.push(fetchGeminiInsight(selectedStock.code.replace('.JK',''), selectedStock.price, selectedStock.change));
         }
         
@@ -768,8 +790,8 @@ const App = () => {
                                             axisLine={false} 
                                             tickLine={false}
                                         />
-                                        {/* Revision: Changed domain to 'auto' so the tallest bar reaches the top of the chart area */}
-                                        <YAxis hide domain={[0, 'auto']} />
+                                        {/* Revision: Changed domain to fixed 0-100 to make bars representative of percentage */}
+                                        <YAxis hide domain={[0, 100]} />
                                         <Tooltip 
                                             cursor={{fill: '#ffffff05'}}
                                             content={<SentimentTooltip />}
