@@ -587,8 +587,8 @@ const App = () => {
                         
                         {/* Main Chart Column (Span 8) */}
                         <div className="lg:col-span-8">
-                            <div className={`${PRIMARY_CARD_STYLE} p-1`}> 
-                                <div className={`${CARD_PADDING}`}>
+                            <div className={`${PRIMARY_CARD_STYLE} p-1 flex flex-col`}> 
+                                <div className={`${CARD_PADDING} flex-1 flex flex-col`}>
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
                                         <div>
                                             <h3 className="text-xl font-bold text-white flex items-center gap-3">{displayCode} Forecast <span className="text-[11px] uppercase font-bold text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-full bg-indigo-500/10 tracking-wider">XGBoost v2</span></h3>
@@ -605,9 +605,8 @@ const App = () => {
                                         </div>
                                     </div>
 
-                                    {/* FIX RECHARTS WIDTH (-1) ERROR: Added Fixed Height Wrapper */}
-                                    <div className="w-full min-w-0" style={{ height: '300px' }}>
-                                        {/* Fix: Use wrapper with fixed height */}
+                                    {/* FIX RECHARTS WIDTH (-1) ERROR: Added Fixed Height Wrapper -> Changed to flex-1 */}
+                                    <div className="w-full min-w-0 flex-1 min-h-[300px]"> 
                                         {chartData.length > 0 ? (
                                             <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                                                 <ResponsiveContainer width="99%" height="100%">
