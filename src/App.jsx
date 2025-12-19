@@ -348,18 +348,18 @@ const AllMarketMoversTable = ({ stockList, onSelectStock }) => {
 
             <div className="overflow-x-auto custom-scrollbar rounded-xl border border-white/5">
                 <table className="min-w-full divide-y divide-white/10">
-                    <thead className="bg-[#1f2937]/50 sticky top-0 backdrop-blur-sm">
-                        <tr>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">CODE</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:table-cell">COMPANY NAME</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">
-                                <button onClick={() => handleSort('type')} className="flex items-center hover:text-white transition-colors">SECTOR <SortIcon columnKey="type" /></button>
+                    <thead className="bg-[#111827] sticky top-0 z-10 border-b border-white/10">
+                        <tr className="select-none">
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider">CODE</th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider hidden sm:table-cell">COMPANY NAME</th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider hidden md:table-cell">
+                                <button onClick={() => handleSort('type')} className="flex items-center hover:text-white transition-colors focus:outline-none outline-none">SECTOR <SortIcon columnKey="type" /></button>
                             </th>
-                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                <button onClick={() => handleSort('price')} className="flex items-center justify-end w-full hover:text-white transition-colors">PRICE <SortIcon columnKey="price" /></button>
+                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 tracking-wider">
+                                <button onClick={() => handleSort('price')} className="flex items-center justify-end w-full hover:text-white transition-colors focus:outline-none outline-none">PRICE <SortIcon columnKey="price" /></button>
                             </th>
-                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                <button onClick={() => handleSort('change')} className="flex items-center justify-end w-full hover:text-white transition-colors">CHANGE (%) <SortIcon columnKey="change" /></button>
+                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 tracking-wider">
+                                <button onClick={() => handleSort('change')} className="flex items-center justify-end w-full hover:text-white transition-colors focus:outline-none outline-none">CHANGE (%) <SortIcon columnKey="change" /></button>
                             </th>
                         </tr>
                     </thead>
@@ -722,7 +722,7 @@ const App = () => {
                                 <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/10"><Activity size={18} className={priceForecastInterpretation.color.replace('text-', 'text-')} /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
-                                <h3 className={`text-2xl sm:text-3xl font-black tracking-tight uppercase leading-none drop-shadow-md ${priceForecastInterpretation.color}`}>{priceForecastInterpretation.signal}</h3>
+                                <h3 className={`text-2xl sm:text-3xl font-black tracking-tight leading-none drop-shadow-md ${priceForecastInterpretation.color}`}>{priceForecastInterpretation.signal}</h3>
                                 <div className="mt-2 pt-3 border-t border-white/5 flex items-center gap-2"><span className="px-2 py-1 rounded-md bg-white/5 text-xs text-slate-400 font-mono">Confidence: 87.4%</span></div>
                             </div>
                         </div>
@@ -944,7 +944,7 @@ const App = () => {
                                     newsData.slice(0, 3).map((news) => (
                                         <div key={news.id} className="group relative pl-4 border-l-2 border-white/5 hover:border-indigo-500 transition-colors shrink-0">
                                             <div className="flex justify-between items-start mb-1">
-                                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{news.source || 'News'}</span>
+                                                <span className="text-[10px] font-bold text-slate-500 tracking-wider">{news.source || 'NEWS'}</span>
                                                 <span className={`w-2 h-2 rounded-full ${news.sentiment === 'positive' ? 'bg-emerald-500' : news.sentiment === 'negative' ? 'bg-rose-500' : 'bg-violet-500'}`}></span>
                                             </div>
                                             <a href={news.url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug hover:text-indigo-400 transition-colors line-clamp-2 block mb-1">{news.title}</a>
