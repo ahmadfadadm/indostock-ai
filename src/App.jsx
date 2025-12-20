@@ -1,33 +1,35 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell
+  BarChart, Bar, Cell, ComposedChart, Line
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Activity, Newspaper, Bell, 
   Menu, User, ArrowUpRight, ArrowDownRight, Zap, 
   BarChart2, RefreshCw, ChevronRight, Wind, AlertTriangle, 
   ListOrdered, ShieldHalf, X, ExternalLink, FileText,
-  Sparkles, Bot, BrainCircuit, Search, ArrowUp, ArrowDown, Users, DollarSign
+  Sparkles, Bot, BrainCircuit, Search, ArrowUp, ArrowDown, Users, DollarSign,
+  CheckCircle2, Target, Percent
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { getGeminiInsight } from './gemini';
 
-// Strict spacing system
+// Layout spacing constants
 const LAYOUT_PX = "px-6 lg:px-8"; 
 const LAYOUT_GAP = "gap-6 lg:gap-8"; 
 const CARD_PADDING = "p-6"; 
 
-// Common card styles
+// Reusable card styles
 const COMMON_CARD_STYLE = `bg-[#111827]/60 backdrop-blur-2xl border border-white/5 rounded-3xl ${CARD_PADDING} shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 transition-all duration-300 group relative overflow-hidden`;
 
-const UNIFIED_CARD_HEIGHT = "h-[400px]"; 
+const unifiedCardHeight = "h-[400px]"; 
 
 // Card style variants
 const PRIMARY_CARD_STYLE = `${COMMON_CARD_STYLE} h-full`; 
-const SECONDARY_CARD_STYLE = `${COMMON_CARD_STYLE} ${UNIFIED_CARD_HEIGHT}`; 
+const SECONDARY_CARD_STYLE = `${COMMON_CARD_STYLE} ${unifiedCardHeight}`; 
 
-const COMPANY_META = {
+// Company metadata
+const companyMeta = {
   'BBCA.JK': { name: 'Bank Central Asia Tbk', type: 'Finance' },
   'BBRI.JK': { name: 'Bank Rakyat Indonesia (Persero) Tbk', type: 'Finance' },
   'TLKM.JK': { name: 'Telkom Indonesia (Persero) Tbk', type: 'Infrastructure' },
@@ -39,7 +41,7 @@ const COMPANY_META = {
   'ADRO.JK': { name: 'Adaro Energy Indonesia Tbk', type: 'Energy' },
   'BBNI.JK': { name: 'Bank Negara Indonesia (Persero) Tbk', type: 'Finance' },
   'UNTR.JK': { name: 'United Tractors Tbk', type: 'Industrial' },
-  'AMRT.JK': { name: 'Sumber Alfaria Trijaya Tbk', type: 'Consumer' },
+  'AMRT.JK': { name: 'Sumber Alfaria Tajaya Tbk', type: 'Consumer' },
   'MDKA.JK': { name: 'Merdeka Copper Gold Tbk', type: 'Basic Materials' },
   'KLBF.JK': { name: 'Kalbe Farma Tbk', type: 'Healthcare' },
   'INCO.JK': { name: 'Vale Indonesia Tbk', type: 'Basic Materials' },
@@ -50,15 +52,17 @@ const COMPANY_META = {
   'ANTM.JK': { name: 'Aneka Tambang Tbk', type: 'Basic Materials' }
 };
 
-const SENTIMENT_COLORS = {
+// Sentiment color configuration
+const sentimentColors = {
   positive: '#10b981', 
   negative: '#f43f5e', 
   neutral: '#8b5cf6',  
 };
 
-const CHART_RANGES = ['5D', '1M', '6M', 'YTD', '1Y'];
+// Chart time ranges
+const chartRanges = ['5D', '1M', '6M', 'YTD', '1Y'];
 
-// Helper functions
+// Utility components for the dashboard
 const StockLogo = ({ code, className = "w-8 h-8", fallbackClass = "" }) => {
     const [imgError, setImgError] = useState(false);
     const cleanCode = code ? code.replace('.JK', '') : 'XX';
@@ -80,6 +84,72 @@ const StockLogo = ({ code, className = "w-8 h-8", fallbackClass = "" }) => {
         />
     );
 };
+
+// Skeleton components for loading states
+const MetricSkeleton = () => (
+    <div className={`${COMMON_CARD_STYLE} h-full min-h-[180px] animate-pulse`}>
+      <div className="flex justify-between items-start mb-4">
+        <div className="h-4 w-24 bg-white/5 rounded"></div>
+        <div className="h-9 w-9 bg-white/5 rounded-xl"></div>
+      </div>
+      <div className="flex-1 flex flex-col justify-end gap-2">
+        <div className="h-8 w-32 bg-white/5 rounded"></div>
+        <div className="h-4 w-20 bg-white/5 rounded mt-2"></div>
+      </div>
+    </div>
+);
+
+const NewsFeedSkeleton = () => (
+    <div className={`${COMMON_CARD_STYLE} animate-pulse`}>
+      <div className="h-8 w-64 bg-white/5 rounded-xl mb-8"></div>
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-24 bg-white/2 rounded-2xl border border-white/5"></div>
+        ))}
+      </div>
+    </div>
+);
+
+const MarketMoversSkeleton = () => (
+    <div className={`${COMMON_CARD_STYLE} animate-pulse`}>
+      <div className="h-8 w-64 bg-white/5 rounded-xl mb-6"></div>
+      <div className="h-12 w-full bg-white/5 rounded-xl mb-6"></div>
+      <div className="h-[400px] bg-white/2 rounded-xl border border-white/5"></div>
+    </div>
+);
+
+const ModelEvaluationSkeleton = () => (
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 ${LAYOUT_GAP} animate-pulse`}>
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className={`${COMMON_CARD_STYLE} h-40`}>
+          <div className="h-4 w-24 bg-white/5 rounded mb-4"></div>
+          <div className="h-8 w-32 bg-white/5 rounded"></div>
+        </div>
+      ))}
+      <div className="lg:col-span-8 h-[450px] bg-white/2 rounded-3xl border border-white/5"></div>
+      <div className="lg:col-span-4 h-[450px] bg-white/2 rounded-3xl border border-white/5"></div>
+    </div>
+);
+
+const DashboardSkeleton = () => (
+    <div className={`flex flex-col ${LAYOUT_GAP} animate-pulse`}>
+      <div className="flex justify-between items-end gap-4">
+        <div className="space-y-2">
+          <div className="h-10 w-64 bg-white/5 rounded-xl"></div>
+          <div className="h-5 w-48 bg-white/5 rounded-lg"></div>
+        </div>
+        <div className="h-12 w-32 bg-white/5 rounded-xl hidden lg:block"></div>
+      </div>
+      <div className="h-40 -mx-6 lg:-mx-8 bg-white/2 border-y border-white/5"></div>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${LAYOUT_GAP}`}>
+        {[...Array(4)].map((_, i) => <MetricSkeleton key={i} />)}
+      </div>
+      <div className={`grid grid-cols-1 lg:grid-cols-12 ${LAYOUT_GAP}`}>
+        <div className="lg:col-span-8 h-[400px] bg-white/2 rounded-3xl border border-white/5"></div>
+        <div className="lg:col-span-4 h-[400px] bg-white/2 rounded-3xl border border-white/5"></div>
+      </div>
+    </div>
+);
 
 const getMonthName = (monthIndex) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -112,7 +182,7 @@ const getStartDateISO = (range) => {
     return `${year}-${month}-${day}`;
 };
 
-// Ui components
+// Tooltip and visualization components
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -193,13 +263,103 @@ const SentimentBadge = ({ sentiment }) => {
 };
 
 const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
+  const scrollRef = useRef(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const velocity = useRef(0);
+  const lastTime = useRef(0);
+  const lastX = useRef(0);
+  const requestRef = useRef(null);
+
+  // Animate scroll inertia
+  const step = useCallback(() => {
+    if (Math.abs(velocity.current) > 0.5) {
+      if (scrollRef.current) {
+        scrollRef.current.scrollLeft += velocity.current;
+      }
+      velocity.current *= 0.95; 
+      requestRef.current = requestAnimationFrame(step);
+    } else {
+      velocity.current = 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if (Math.abs(e.deltaX) > 0) return;
+      
+      const isAtLeft = el.scrollLeft <= 0;
+      const isAtRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+
+      if ((e.deltaY < 0 && isAtLeft) || (e.deltaY > 0 && isAtRight)) {
+        return;
+      }
+
+      e.preventDefault();
+      velocity.current += e.deltaY * 0.15;
+      
+      cancelAnimationFrame(requestRef.current);
+      requestRef.current = requestAnimationFrame(step);
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [step]);
+
+  const handleMouseDown = (e) => {
+    isDown.current = true;
+    cancelAnimationFrame(requestRef.current);
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+    lastX.current = e.pageX;
+    lastTime.current = performance.now();
+    velocity.current = 0;
+  };
+
+  const handleMouseLeave = () => {
+    isDown.current = false;
+  };
+
+  const handleMouseUp = () => {
+    isDown.current = false;
+    requestRef.current = requestAnimationFrame(step);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDown.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current);
+    
+    const currentTime = performance.now();
+    const timeDiff = currentTime - lastTime.current;
+    if (timeDiff > 0) {
+      velocity.current = -(e.pageX - lastX.current) * (16 / timeDiff) * 1.5;
+    }
+    
+    scrollRef.current.scrollLeft = scrollLeft.current - walk;
+    lastX.current = e.pageX;
+    lastTime.current = currentTime;
+  };
+
   if (!stockList || stockList.length === 0) return <div className="p-4 text-slate-500 text-sm animate-pulse">Waiting for market data...</div>;
 
   return (
     <div className="-mx-6 lg:-mx-8 relative">
         <div className="absolute -top-2 -bottom-7 right-0 w-28 sm:w-56 bg-gradient-to-l from-[#020617] via-[#020617]/70 to-transparent z-30 pointer-events-none" />
 
-        <div className="relative w-full overflow-x-auto whitespace-nowrap hide-scrollbar px-6 lg:px-8 py-10 -my-10">
+        <div 
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          className="relative w-full overflow-x-auto whitespace-nowrap hide-scrollbar px-6 lg:px-8 py-10 -my-10 cursor-grab active:cursor-grabbing"
+        >
             <div className={`flex ${LAYOUT_GAP}`}> 
             {stockList.map((stock) => {
                 const isSelected = selectedStock && stock.code === selectedStock.code;
@@ -221,7 +381,7 @@ const StockSlider = ({ stockList, selectedStock, onSelectStock }) => {
                         <div className="flex justify-between items-start w-full mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 shrink-0"><StockLogo code={stock.code} className="w-full h-full" /></div>
-                                <span className={`text-xl font-extrabold tracking-wide ${isSelected ? 'text-white' : 'text-slate-200'}`}>{stock.code.replace('.JK','')}</span>
+                                <span className={`text-xl font-extrabold tracking-wide ${isSelected ? 'text-white' : 'text-slate-200'}`}>{stock.code.replace('.JK', '')}</span>
                             </div>
                             {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_15px_white] animate-pulse"></div>}
                         </div>
@@ -261,7 +421,7 @@ const FullNewsFeed = ({ newsData, selectedCode }) => (
                 <div key={news.id} className="group p-5 bg-white/2 rounded-2xl hover:bg-white/5 transition-all border border-white/5 hover:border-white/10 relative">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3">
                         <span className="text-xs text-slate-500 font-mono flex items-center gap-2">
-                            <span className="bg-white/5 border border-white/5 px-2 py-1 rounded text-slate-300 font-bold">{news.source || 'News'}</span> 
+                            <span className="bg-white/5 border border-white/5 px-2 py-1 rounded text-slate-300 font-bold">{news.source || 'NEWS'}</span> 
                             <span>{news.time}</span>
                         </span>
                         <SentimentBadge sentiment={news.sentiment} />
@@ -293,6 +453,8 @@ const AllMarketMoversTable = ({ stockList, onSelectStock }) => {
             switch (sortBy) {
                 case 'code':
                     valA = a.code; valB = b.code; break;
+                case 'name':
+                    valA = a.name; valB = b.name; break;
                 case 'price':
                     valA = a.price || 0; valB = b.price || 0; break;
                 case 'change':
@@ -317,7 +479,7 @@ const AllMarketMoversTable = ({ stockList, onSelectStock }) => {
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
         } else {
             setSortBy(key);
-            setSortDirection(key === 'code' || key === 'type' ? 'asc' : 'desc');
+            setSortDirection(key === 'code' || key === 'type' || key === 'name' ? 'asc' : 'desc');
         }
     };
 
@@ -350,8 +512,12 @@ const AllMarketMoversTable = ({ stockList, onSelectStock }) => {
                 <table className="min-w-full divide-y divide-white/10">
                     <thead className="bg-[#1f2937]/50 sticky top-0 backdrop-blur-sm">
                         <tr>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider">CODE</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider hidden sm:table-cell">COMPANY NAME</th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider">
+                                <button onClick={() => handleSort('code')} className="flex items-center hover:text-white transition-colors">CODE <SortIcon columnKey="code" /></button>
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider hidden sm:table-cell">
+                                <button onClick={() => handleSort('name')} className="flex items-center hover:text-white transition-colors">COMPANY NAME <SortIcon columnKey="name" /></button>
+                            </th>
                             <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-wider hidden md:table-cell">
                                 <button onClick={() => handleSort('type')} className="flex items-center hover:text-white transition-colors">SECTOR <SortIcon columnKey="type" /></button>
                             </th>
@@ -410,6 +576,70 @@ const DetailViewPlaceholder = ({ title }) => (
     </div>
 );
 
+// Upgrade Popup component for premium offers
+const UpgradePopup = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div 
+        className="absolute inset-0 bg-[#020617]/40 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={onClose}
+      />
+      <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-lg w-full relative z-10 shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl"></div>
+        
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white bg-white/5 rounded-full transition-colors"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="relative">
+          <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-6 shadow-xl shadow-indigo-500/20">
+            <Zap size={32} className="text-white" />
+          </div>
+
+          <h2 className="text-3xl font-bold text-white mb-2">Upgrade to Pro</h2>
+          <p className="text-slate-400 mb-8 leading-relaxed">
+            Unlock advanced machine learning signals and institutional-grade market predictions for your portfolio.
+          </p>
+
+          <div className="space-y-4 mb-10">
+            {[
+              "Real-time XGBoost Prediction Models",
+              "Advanced Sentiment & News Analysis",
+              "Unlimited Model Evaluation Backtests",
+              "Multi-device Push Notifications"
+            ].map((feature, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                  <CheckCircle2 size={12} className="text-emerald-400" />
+                </div>
+                <span className="text-slate-300 text-sm font-medium">{feature}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between p-6 bg-white/5 rounded-2xl border border-white/5 mb-8">
+            <div>
+              <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Monthly Plan</p>
+              <h3 className="text-2xl font-bold text-white">Rp 299.000<span className="text-sm font-medium text-slate-500"> /mo</span></h3>
+            </div>
+            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-400 text-[10px] font-black rounded-lg border border-indigo-500/20">MOST POPULAR</span>
+          </div>
+
+          <button className="w-full py-4 bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]">
+            Get Started Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
   const [stockList, setStockList] = useState([]);
   const [selectedStock, setSelectedStock] = useState(null);
@@ -419,28 +649,33 @@ const App = () => {
   const [mainView, setMainView] = useState('Dashboard');
   const [chartRange, setChartRange] = useState('1M');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
-  // State for ai
+  // New states for hierarchical loading
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSkeletonVisible, setIsSkeletonVisible] = useState(false);
+
+  // Artificial intelligence analysis state
   const [aiAnalysis, setAiAnalysis] = useState({ 
-    text: "Initializing neural market scanners...", 
+    text: "", 
     upside: "", 
     sentiment: "" 
   });
   
-  // Cache for ai insights
+  // Cache for intelligence node insights
   const [aiCache, setAiCache] = useState({});
 
   const [typedText, setTypedText] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Fallback generator to ensure content is never empty
+  // Generate fallback content for limited services
   const generateFallbackInsight = (code, price, change) => {
     const direction = change >= 0 ? "bullish" : "bearish";
     const intensity = Math.abs(change) > 1.5 ? "significant" : "stable";
-    return `Current monitoring of ${code} shows ${intensity} ${direction} momentum at Rp ${price.toLocaleString()}. Our algorithmic models are observing price action consolidation with a ${Math.abs(change).toFixed(2)}% variance from the previous baseline. Maintain observation for volume breakouts.`;
+    return `Analysis of ${code} indicates ${intensity} ${direction} momentum at Rp ${price.toLocaleString()}. Models suggest price action is currently adjusting with a ${Math.abs(change).toFixed(2)}% variance. Keep monitoring for breakout signals.`;
   };
 
-  // Typewriter effect logic
+  // Typewriter animation effect
   useEffect(() => {
     if (!aiAnalysis.text) return;
     
@@ -462,37 +697,40 @@ const App = () => {
     return () => clearInterval(intervalId);
   }, [aiAnalysis.text]);
 
-  // Check cache before fetching gemini insight
+  // Retrieve market insights from gemini or cache
   const fetchGeminiInsight = useCallback(async (stockCode, price, change) => {
     const fallbackText = generateFallbackInsight(stockCode, price, change);
+    
+    setTypedText("");
+    setAiAnalysis({ text: "" });
+    setIsAiLoading(true);
 
     if (aiCache[stockCode]) {
-        setAiAnalysis(aiCache[stockCode]);
+        setTimeout(() => {
+            setAiAnalysis(aiCache[stockCode]);
+            setIsAiLoading(false);
+        }, 100);
         return;
     }
-
-    setIsAiLoading(true);
-    setTypedText("");
     
     try {
         const data = await getGeminiInsight(stockCode, price, change);
+        const finalContent = (data && data.summary && data.summary.trim() !== "") 
+            ? data.summary 
+            : fallbackText;
 
-        // Ensure text is never empty by using fallback if summary is null or short
         const result = {
-            text: (data && data.summary && data.summary.length > 10) ? data.summary : fallbackText,
+            text: finalContent,
             upside: "",
             sentiment: "",
         };
         
         setAiAnalysis(result);
-        setAiCache(prev => ({
-            ...prev,
-            [stockCode]: result
-        }));
+        setAiCache(prev => ({ ...prev, [stockCode]: result }));
     } catch (error) {
-        console.error("Ai error:", error);
+        console.error("Intelligence node error:", error);
         setAiAnalysis({
-            text: `System alert: Connection to intelligence node throttled. Summary: ${fallbackText}`,
+            text: "AI server is currently busy. Please refresh later.",
             upside: "",
             sentiment: "",
         });
@@ -543,7 +781,7 @@ const App = () => {
 
   const fetchMarketData = useCallback(async () => {
     try {
-        const codes = Object.keys(COMPANY_META);
+        const codes = Object.keys(companyMeta);
         let tempStockList = [];
         for (const code of codes) {
             const { data, error } = await supabase.from('stock_predictions').select('*').eq('code', code).order('date', { ascending: false }).limit(2);
@@ -554,14 +792,14 @@ const App = () => {
                 const prevPrice = prev.actual_close || prev.predicted_close || price;
                 const change = prevPrice !== 0 ? ((price - prevPrice) / prevPrice) * 100 : 0;
                 tempStockList.push({
-                    code: code, name: COMPANY_META[code].name, type: COMPANY_META[code].type,
+                    code: code, name: companyMeta[code].name, type: companyMeta[code].type,
                     price: price, change: change, volatility: latest.predicted_volatility
                 });
             }
         }
         setStockList(tempStockList);
         if (!selectedStock && tempStockList.length > 0) setSelectedStock(tempStockList.find(s => s.code === 'BBCA.JK') || tempStockList[0]);
-    } catch (err) { console.error("Fetch error:", err); }
+    } catch (err) { console.error("Database fetch error:", err); }
   }, [selectedStock]);
 
   const fetchChartData = useCallback(async () => {
@@ -576,11 +814,10 @@ const App = () => {
         if (startDate) query = query.gte('date', startDate);
     }
     
-    // Use await to get the actual result from the database
     const { data, error } = await query;
     
     if (error) {
-        console.error("Database fetch error:", error);
+        console.error("Chart query error:", error);
         return;
     }
 
@@ -609,7 +846,17 @@ const App = () => {
     }
   }, [selectedStock]); 
 
-  useEffect(() => { fetchMarketData(); }, []);
+  // Initial data loading cycle with skeleton phase
+  useEffect(() => { 
+    const init = async () => {
+        await fetchMarketData();
+        setIsInitialLoading(false);
+        setIsSkeletonVisible(true);
+        // Skeleton phase for visual transition
+        setTimeout(() => setIsSkeletonVisible(false), 1200);
+    };
+    init();
+  }, []);
   
   useEffect(() => { 
     if (selectedStock) { 
@@ -619,7 +866,7 @@ const App = () => {
     } 
   }, [selectedStock, chartRange, fetchChartData, fetchNews, fetchGeminiInsight]);
 
-  // Synchronize data fetching
+  // Synchronize all dashboard data
   const handleRefreshData = async () => { 
       if (isRefreshing) return;
       setIsRefreshing(true);
@@ -633,7 +880,7 @@ const App = () => {
         
         await Promise.all(promises);
       } catch (error) {
-        console.error("Sync failure:", error);
+        console.error("Dashboard synchronization failure:", error);
       } finally {
         setTimeout(() => setIsRefreshing(false), 1000); 
       }
@@ -641,7 +888,7 @@ const App = () => {
   
   const handleSelectStock = (stock) => { setSelectedStock(stock); setMainView('Dashboard'); setChartRange('1M'); };
   const handleRangeChange = (range) => setChartRange(range);
-  const handleBellClick = () => console.log("Notification clicked");
+  const handleBellClick = () => console.log("Notification event triggered");
 
   const volatilityData = useMemo(() => {
       if (!selectedStock) return { volatility: 0, regime: 'N/A', color: 'text-slate-400' };
@@ -663,9 +910,9 @@ const App = () => {
     const total = pos + neg + neu || 1;
     
     return [
-        { name: 'Positive', value: Math.round((pos/total)*100), color: SENTIMENT_COLORS.positive },
-        { name: 'Negative', value: Math.round((neg/total)*100), color: SENTIMENT_COLORS.negative },
-        { name: 'Neutral', value: Math.round((neu/total)*100), color: SENTIMENT_COLORS.neutral },
+        { name: 'Positive', value: Math.round((pos/total)*100), color: sentimentColors.positive },
+        { name: 'Negative', value: Math.round((neg/total)*100), color: sentimentColors.negative },
+        { name: 'Neutral', value: Math.round((neu/total)*100), color: sentimentColors.neutral },
     ];
   }, [selectedStock, newsData]);
 
@@ -690,19 +937,158 @@ const App = () => {
       return [...stockList].sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
   }, [stockList]);
     
+  // Computational block for regression model metrics
+  const evaluationMetrics = useMemo(() => {
+    if (!chartData || chartData.length < 5) return null;
+
+    const validPairs = chartData.filter(d => d.price && d.forecast);
+    if (validPairs.length === 0) return null;
+
+    const n = validPairs.length;
+    let sumSqError = 0;
+    let sumAbsError = 0;
+    let sumAbsPctError = 0;
+    let sumActual = 0;
+
+    validPairs.forEach(d => {
+      const error = d.price - d.forecast;
+      sumSqError += Math.pow(error, 2);
+      sumAbsError += Math.abs(error);
+      sumAbsPctError += (Math.abs(error) / d.price);
+      sumActual += d.price;
+    });
+
+    const meanActual = sumActual / n;
+    let totalSq = 0;
+    validPairs.forEach(d => totalSq += Math.pow(d.price - meanActual, 2));
+
+    const rmse = Math.sqrt(sumSqError / n);
+    const mae = sumAbsError / n;
+    const mape = (sumAbsPctError / n) * 100;
+    const r2 = 1 - (sumSqError / totalSq);
+
+    // Dynamic confidence score derived from R2 and MAPE
+    const confidence = Math.max(0, Math.min(100, (r2 * 80) + (Math.max(0, 100 - mape) * 0.2)));
+
+    const residuals = validPairs.map(d => ({
+      date: d.day,
+      residual: d.price - d.forecast,
+      actual: d.price,
+      predicted: d.forecast
+    }));
+
+    return { rmse, mae, mape, r2, confidence, residuals };
+  }, [chartData]);
+
   const renderMainContent = () => {
-    if (!selectedStock) return <div className="text-white text-center p-20 flex flex-col items-center gap-4"><div className="relative"><RefreshCw className="animate-spin text-indigo-500" size={40}/><div className="absolute inset-0 animate-ping bg-indigo-500 rounded-full opacity-20"></div></div><p className="text-slate-400">Loading market data...</p></div>;
+    // Phase 1: Full loader while fetching database
+    if (isInitialLoading) {
+        return (
+            <div className="text-white text-center p-20 flex flex-col items-center gap-4">
+                <div className="relative">
+                    <RefreshCw className="animate-spin text-indigo-500" size={40}/>
+                    <div className="absolute inset-0 animate-ping bg-indigo-500 rounded-full opacity-20"></div>
+                </div>
+                <p className="text-slate-400 font-medium">Loading market data...</p>
+            </div>
+        );
+    }
+
+    // Phase 2: Skeleton UI for layout preparation
+    if (isSkeletonVisible || !selectedStock) {
+        switch (mainView) {
+            case 'Full News Feed': return <NewsFeedSkeleton />;
+            case 'All Market Movers': return <MarketMoversSkeleton />;
+            case 'Model Evaluation': return <ModelEvaluationSkeleton />;
+            default: return <DashboardSkeleton />;
+        }
+    }
+
     const displayCode = selectedStock.code.replace('.JK', ''); 
 
     switch (mainView) {
         case 'Full News Feed': return <FullNewsFeed newsData={newsData} selectedCode={displayCode} />;
         case 'All Market Movers': return <AllMarketMoversTable stockList={stockList} onSelectStock={handleSelectStock} />; 
-        case 'Model Evaluation': return <DetailViewPlaceholder title="Model Evaluation & Backtest" />;
+        case 'Model Evaluation': 
+            const metrics = evaluationMetrics;
+            if (!metrics) return <DetailViewPlaceholder title="Insufficient Data for Evaluation" />;
+            return (
+              <div className={`flex flex-col ${LAYOUT_GAP}`}>
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
+                  <div>
+                    <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                      XGBOOST <span className="text-indigo-400 bg-indigo-500/10 px-3 py-0.5 rounded-xl border border-indigo-500/20 text-2xl">Performance</span>
+                    </h2>
+                    <p className="text-base text-slate-400 font-medium flex items-center gap-2">
+                      Quantitative evaluation for {displayCode} across selected timeframe.
+                    </p>
+                  </div>
+                </div>
+
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${LAYOUT_GAP}`}>
+                  <MetricCard title="Root Mean Sq Error" value={metrics.rmse.toFixed(2)} change={0} icon={Target} subLabel="RMSE Deviation" />
+                  <MetricCard title="Mean Absolute Error" value={metrics.mae.toFixed(2)} change={0} icon={ShieldHalf} subLabel="Average Variance" />
+                  <MetricCard title="Mean Abs Pct Error" value={`${metrics.mape.toFixed(2)}%`} change={0} icon={Percent} subLabel="Relative Accuracy" />
+                  <MetricCard title="R² Score (Fit)" value={metrics.r2.toFixed(4)} change={0} icon={Activity} subLabel="Coefficient Determination" />
+                </div>
+
+                <div className={`grid grid-cols-1 lg:grid-cols-12 ${LAYOUT_GAP}`}>
+                  <div className="lg:col-span-8">
+                    <div className={PRIMARY_CARD_STYLE}>
+                      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">Residual Distribution <span className="text-[10px] text-slate-500 font-mono">ACTUAL - PREDICTED</span></h3>
+                      <div className="h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={metrics.residuals}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                            <XAxis dataKey="date" hide />
+                            <YAxis stroke="#64748b" tick={{fontSize: 11}} />
+                            <Tooltip 
+                                contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px'}}
+                                itemStyle={{fontSize: '12px'}}
+                            />
+                            <Bar dataKey="residual" fill="#6366f1" radius={[4, 4, 0, 0]} opacity={0.6} />
+                            <Line type="monotone" dataKey="residual" stroke="#818cf8" strokeWidth={2} dot={false} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-4">
+                    <div className={PRIMARY_CARD_STYLE}>
+                      <h3 className="text-xl font-bold text-white mb-6">Model Metadata</h3>
+                      <div className="space-y-6">
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-2">Algorithm</p>
+                          <p className="text-white font-mono">eXtreme Gradient Boosting</p>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-2">Dynamic Confidence</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-black text-indigo-400">{metrics.confidence.toFixed(1)}%</span>
+                            <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500" style={{width: `${metrics.confidence}%`}}></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-2">Features Used</p>
+                          <div className="flex flex-wrap gap-2">
+                            {['Lags', 'MA', 'RSI', 'MACD', 'Vol'].map(f => (
+                              <span key={f} className="px-2 py-1 bg-slate-800 text-[10px] text-slate-300 rounded-md">{f}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
         case 'Dashboard':
         default:
             return (
                 <div className={`flex flex-col ${LAYOUT_GAP}`}>
-                    {/* Header section */}
+                    {/* Primary header information */}
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
                         <div>
                             <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
@@ -720,24 +1106,28 @@ const App = () => {
                       
                     <StockSlider stockList={stockList} selectedStock={selectedStock} onSelectStock={handleSelectStock} />
 
-                    {/* Metrics grid */}
+                    {/* Dashboard summary metrics */}
                     <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${LAYOUT_GAP}`}>
                         <MetricCard title="Target Close (Est)" value={priceForecastInterpretation.endPrice ? Math.round(priceForecastInterpretation.endPrice).toLocaleString() : 'N/A'} change={parseFloat(priceForecastInterpretation.diff)} isCurrency icon={Zap} subLabel="Model Forecast" />
                         
                         <div className={`${COMMON_CARD_STYLE} flex flex-col justify-between hover:-translate-y-1 h-full min-h-[180px]`}>
                             <div className="flex items-start justify-between w-full mb-4">
-                                <p className="text-slate-400 text-sm font-semibold tracking-wide">STOCK SIGNAL</p>
+                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">STOCK SIGNAL</p>
                                 <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/10"><Activity size={18} className={priceForecastInterpretation.color.replace('text-', 'text-')} /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
                                 <h3 className={`text-2xl sm:text-3xl font-black tracking-tight leading-none drop-shadow-md ${priceForecastInterpretation.color}`}>{priceForecastInterpretation.signal}</h3>
-                                <div className="mt-2 pt-3 border-t border-white/5 flex items-center gap-2"><span className="px-2 py-1 rounded-md bg-white/5 text-xs text-slate-400 font-mono">Confidence: 87.4%</span></div>
+                                <div className="mt-2 pt-3 border-t border-white/5 flex items-center gap-2">
+                                  <span className="px-2 py-1 rounded-md bg-white/5 text-xs text-slate-400 font-mono">
+                                    Confidence: {evaluationMetrics ? evaluationMetrics.confidence.toFixed(1) : '87.4'}%
+                                  </span>
+                                </div>
                             </div>
                         </div>
 
                         <div className={`${COMMON_CARD_STYLE} flex flex-col justify-between hover:-translate-y-1 h-full min-h-[180px]`}>
                             <div className="flex items-start justify-between w-full mb-4">
-                                <p className="text-slate-400 text-sm font-semibold tracking-wide">VOLATILITY</p>
+                                <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">VOLATILITY</p>
                                 <div className="p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/10"><Wind size={18} className="text-blue-400" /></div>
                             </div>
                             <div className="flex-1 flex flex-col justify-end gap-2">
@@ -751,21 +1141,28 @@ const App = () => {
 
                     <div className={`grid grid-cols-1 lg:grid-cols-12 ${LAYOUT_GAP}`}>
                         
-                        {/* Main chart column */}
+                        {/* Visualization area for stock prices */}
                         <div className="lg:col-span-8">
-                            <div className={`${PRIMARY_CARD_STYLE} p-1 flex flex-col`}> 
-                                <div className={`${CARD_PADDING} flex-1 flex flex-col`}>
+                            <div className={PRIMARY_CARD_STYLE}> 
+                                <div className="h-full flex flex-col">
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
                                         <div>
-                                            {/* Xgboost badge style */}
-                                            <h3 className="text-xl font-bold text-white flex items-center gap-3">{displayCode} Forecast <span className="text-[11px] font-bold text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg bg-indigo-500/10 tracking-wider flex items-center justify-center">XGBOOST</span></h3>
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                                              {displayCode} Forecast 
+                                              <button 
+                                                onClick={() => setMainView('Model Evaluation')}
+                                                className="text-[11px] font-bold text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg bg-indigo-500/10 tracking-wider flex items-center justify-center hover:bg-indigo-500/20 transition-colors"
+                                              >
+                                                XGBOOST
+                                              </button>
+                                            </h3>
                                             <p className="text-sm text-slate-400 mt-2 flex items-center gap-2">
                                                 Current: <span className="text-white font-mono text-base">Rp {selectedStock.price ? selectedStock.price.toLocaleString() : '-'}</span> <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                             </p>
                                         </div>
                                         <div className="w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
                                             <div className="flex bg-[#0b0f19] rounded-xl p-1.5 border border-white/5 w-max shadow-inner">
-                                            {CHART_RANGES.map(range => (
+                                            {chartRanges.map(range => (
                                                 <button key={range} onClick={() => handleRangeChange(range)} className={`px-4 py-1.5 text-xs font-bold transition-all rounded-lg whitespace-nowrap ${chartRange === range ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>{range}</button>
                                             ))}
                                         </div>
@@ -775,8 +1172,8 @@ const App = () => {
                                     <div className="w-full min-w-0 flex-1 min-h-[300px]"> 
                                         {chartData.length > 0 ? (
                                             <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                                <ResponsiveContainer width="99%" height="100%">
-                                                    <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 10 }}> 
+                                                <ResponsiveContainer width="100%" height="100%" debounce={50}> 
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}> 
                                                     <defs>
                                                         <linearGradient id="colorHistory" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient>
                                                         <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
@@ -785,10 +1182,11 @@ const App = () => {
                                                     
                                                     <XAxis 
                                                         dataKey="rawDate" 
-                                                        stroke="#475569" 
+                                                        stroke="#1e293b" 
                                                         tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} 
-                                                        axisLine={false} 
+                                                        axisLine={true} 
                                                         tickLine={false} 
+                                                        tickMargin={12} 
                                                         minTickGap={20} 
                                                         padding={{ left: 0, right: 0 }} 
                                                         ticks={customTicks} 
@@ -810,7 +1208,15 @@ const App = () => {
                                                         }}
                                                     />
                                                     
-                                                    <YAxis stroke="#475569" tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} axisLine={false} tickLine={false} tickFormatter={(value) => `${(value/1000).toFixed(1)}k`} tickMargin={16} domain={['auto', 'auto']} />
+                                                    <YAxis 
+                                                        stroke="#1e293b" 
+                                                        tick={{fill: '#64748b', fontSize: 11, fontWeight: 500}} 
+                                                        axisLine={true} 
+                                                        tickLine={false} 
+                                                        tickFormatter={(value) => `${(value/1000).toFixed(1)}k`} 
+                                                        tickMargin={12} 
+                                                        domain={['auto', 'auto']} 
+                                                    />
                                                     
                                                     <Tooltip content={<CustomTooltip />} />
                                                     
@@ -829,7 +1235,7 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* Market movers column */}
+                        {/* List of trending market movers */}
                         <div className="lg:col-span-4">
                             <div className={`${PRIMARY_CARD_STYLE}`}>
                                 <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-slate-200 text-lg">Top Movers (Real)</h3><button onClick={() => setMainView('All Market Movers')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">SCREENER <ChevronRight size={12}/></button></div>
@@ -851,7 +1257,7 @@ const App = () => {
                     
                     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${LAYOUT_GAP}`}>
                         
-                        {/* Ai analysis card */}
+                        {/* Machine learning market analysis display */}
                         <div className={`${SECONDARY_CARD_STYLE} flex flex-col relative overflow-hidden group border-indigo-500/30`}>
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all duration-700"></div>
                             
@@ -873,23 +1279,23 @@ const App = () => {
                                     <div className="flex gap-2">
                                         <div className={`w-1 rounded-full bg-indigo-500 self-stretch shrink-0 ${isAiLoading ? 'animate-pulse' : ''}`}></div>
                                         <div className="flex-1">
-                                            <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                                                {isAiLoading ? (
-                                                    <span className="animate-pulse text-slate-500">Scanning global sentiment and price action...</span>
+                                            <div className="text-sm text-slate-300 leading-relaxed font-medium">
+                                                {isAiLoading && typedText === "" ? (
+                                                    <span className="animate-pulse text-slate-500">Analyzing real-time market action...</span>
                                                 ) : (
                                                     <>
                                                         {typedText}
                                                         <span className="inline-block w-0.5 h-4 ml-1 bg-indigo-400 animate-pulse align-middle"></span>
                                                     </>
                                                 )}
-                                            </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        {/* Sentiment chart */}
+                        {/* Sentiment analysis data visualization */}
                         <div className={`${SECONDARY_CARD_STYLE} flex flex-col`}>
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/10"><Newspaper size={20} className="text-amber-400" /></div>
@@ -899,7 +1305,7 @@ const App = () => {
                             
                             <div className="flex-1 w-full min-h-0">
                             {newsData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                     <BarChart 
                                         data={cnbcSentimentData} 
                                         margin={{ top: 0, right: 0, left: 0, bottom: 0 }} 
@@ -938,7 +1344,7 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* News feed mini */}
+                        {/* Recent news snippets */}
                         <div className={`${SECONDARY_CARD_STYLE} flex flex-col`}>
                             <div className="flex justify-between items-center mb-4 shrink-0"><h3 className="font-bold text-slate-200 text-lg truncate mr-2">Latest News</h3><button onClick={() => setMainView('Full News Feed')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 whitespace-nowrap bg-indigo-500/10 px-2.5 py-1.5 rounded-lg transition-colors">VIEW ALL</button></div>
                             
@@ -977,7 +1383,7 @@ const App = () => {
         <div className="absolute bottom-[-10%] left-[20%] w-[30%] h-[40%] bg-blue-900/10 rounded-full blur-[120px]" />
       </div>
       
-      {/* Global styling */}
+      {/* Global styles and scrollbars */}
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none !important; } 
         .hide-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; } 
@@ -1001,12 +1407,19 @@ const App = () => {
           background: #6366f1;
         }
       `}</style>
+
+      <UpgradePopup isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} />
       
       <div className="flex h-screen overflow-hidden">
         {sidebarOpen && <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
         <aside className={`fixed z-50 lg:relative h-full w-[280px] lg:w-72 bg-[#020617] border-r border-white/5 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-          <div className="p-8 flex items-center justify-between lg:justify-start gap-4 mb-2">
-            <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10"><Zap size={22} className="text-white" /></div><h1 className="text-2xl font-black text-white tracking-tight">IndoStock<span className="text-indigo-400">Ai</span></h1></div>
+          <div className="p-8 flex items-center justify-between lg:justify-start gap-4 mb-2 group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
+                <Zap size={22} className="text-white" />
+              </div>
+              <h1 className="text-2xl font-black text-white tracking-tight">IndoStock<span className="text-indigo-400">AI</span></h1>
+            </div>
             <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white"><X size={24} /></button>
           </div>
           <nav className="mt-4 px-6 space-y-2">
@@ -1023,7 +1436,12 @@ const App = () => {
                 <div className="absolute top-0 right-0 -mt-2 -mr-2 w-16 h-16 bg-indigo-500/20 rounded-full blur-xl"></div>
                 <h4 className="text-white font-bold mb-1 relative z-10">Upgrade Pro</h4>
                 <p className="text-xs text-indigo-200/70 mb-3 relative z-10">Get realtime signals & ai predictions.</p>
-                <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-500/20 transition-all relative z-10">Upgrade Now</button>
+                <button 
+                  onClick={() => setShowUpgrade(true)}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-500/20 transition-all relative z-10"
+                >
+                  Upgrade Now
+                </button>
             </div>
             
           </div>
